@@ -1,0 +1,16 @@
+[
+  {
+    "id": "example-card-1",
+    "created": "2026-06-23T00:00:00+00:00",
+    "type": "basic",
+    "front": "Why do Bode plots evaluate a transfer function at \\(s = j\\omega\\)?",
+    "back": "Because \\(G(j\\omega)\\) describes the steady-state response to sinusoidal inputs.",
+    "tags": ["concept", "formula"],
+    "source": {
+      "text": "A Bode plot evaluates G(s) on the imaginary axis by substituting s = j omega.",
+      "image_b64": null
+    },
+    "render_ok": true,
+    "validation_errors": []
+  }
+]

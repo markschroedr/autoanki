@@ -5,7 +5,7 @@ a = Analysis(
     ["scripts/launch_web.py"],
     pathex=["."],
     binaries=[],
-    datas=[("autoanki/system_prompt.txt", "autoanki")],
+    datas=[("autoanki/system_prompt.txt", "autoanki"), ("autoanki/prompts", "autoanki/prompts")],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

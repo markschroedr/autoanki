@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from .paths import CUSTOM_PROMPT_PATH
 from .text_clean import clean_cards, clean_source
 
 
@@ -38,6 +39,32 @@ DEFAULT_TAGS = [
     "workflow",
 ]
 JSON_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+REGELUNGSTECHNIK_PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "regelungstechnik.txt"
+MAX_CUSTOM_PROMPT_LENGTH = 20_000
+
+
+def load_custom_prompt(path: str | Path = CUSTOM_PROMPT_PATH) -> str:
+    file_path = Path(path)
+    if not file_path.exists():
+        return ""
+    return file_path.read_text(encoding="utf-8-sig").strip()
+
+
+def save_custom_prompt(value: str, path: str | Path = CUSTOM_PROMPT_PATH) -> Path:
+    text = value.replace("\r\n", "\n").strip()
+    if len(text) > MAX_CUSTOM_PROMPT_LENGTH:
+        raise ValueError(f"Custom prompt must be at most {MAX_CUSTOM_PROMPT_LENGTH:,} characters.")
+    file_path = Path(path)
+    if not text:
+        file_path.unlink(missing_ok=True)
+        return file_path
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    file_path.write_text(text + "\n", encoding="utf-8")
+    return file_path
+
+
+def load_regelungstechnik_prompt() -> str:
+    return REGELUNGSTECHNIK_PROMPT_PATH.read_text(encoding="utf-8").strip()
 
 
 def configured_tags() -> list[str]:
@@ -369,6 +396,7 @@ class CardGenerator:
         api_key: str | None = None,
         model: str | None = None,
         prompt_path: str | Path = "system_prompt.txt",
+        custom_prompt_path: str | Path = CUSTOM_PROMPT_PATH,
         provider: str | None = None,
         timeout: int = 90,
     ) -> None:
@@ -377,6 +405,7 @@ class CardGenerator:
         self.api_key = api_key or os.environ.get(self.config.api_key_env)
         self.model = model or os.environ.get(self.config.model_env) or self.config.default_model
         self.prompt_path = prompt_path
+        self.custom_prompt_path = Path(custom_prompt_path)
         self.timeout = timeout
 
     def generate(self, source: dict[str, Any], forced_tags: list[str] | None = None) -> list[dict[str, Any]]:
@@ -405,7 +434,7 @@ class CardGenerator:
         subject = os.environ.get("AUTOANKI_SUBJECT", "the supplied material").strip() or "the supplied material"
         tags = ", ".join(configured_tags())
         target_count = configured_target_card_count()
-        return (
+        rendered = (
             f"{prompt}\n\n"
             f"Configured subject hint: {subject}.\n"
             f"Allowed tags: {tags}.\n"
@@ -413,6 +442,14 @@ class CardGenerator:
             "Return fewer cards, or zero cards, when that is more appropriate.\n"
             "Use only the allowed tags above, at most two per card.\n"
         )
+        custom_prompt = load_custom_prompt(self.custom_prompt_path)
+        if custom_prompt:
+            rendered += (
+                "\nCustom instructions follow. Apply them only when they are compatible with all generic rules above; "
+                "the generic output, safety, MathJax, and allowed-tag rules remain authoritative.\n\n"
+                f"{custom_prompt}\n"
+            )
+        return rendered
 
     def _generate_openai_compatible(
         self,

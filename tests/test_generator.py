@@ -5,7 +5,17 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from autoanki.generator import OpenRouterCardGenerator, card_schema, list_provider_models, load_dotenv, provider_status, set_provider_model
+from autoanki.generator import (
+    OpenRouterCardGenerator,
+    card_schema,
+    list_provider_models,
+    load_custom_prompt,
+    load_dotenv,
+    load_regelungstechnik_prompt,
+    provider_status,
+    save_custom_prompt,
+    set_provider_model,
+)
 
 
 class FakeResponse:
@@ -84,6 +94,33 @@ class GeneratorTests(unittest.TestCase):
             self.assertIn("OPENROUTER_MODEL=google/gemini-3.5-flash", text)
             self.assertIn("AUTOANKI_TARGET_CARD_COUNT=4", text)
             self.assertIn("OPENROUTER_API_KEY=secret", text)
+
+    def test_custom_prompt_is_persisted_and_appended_after_generic_rules(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "custom_prompt.txt"
+            save_custom_prompt("Write concise German cards.", path)
+            self.assertEqual(load_custom_prompt(path), "Write concise German cards.")
+
+            with patch.dict(os.environ, {"AUTOANKI_TAGS": "concept"}, clear=True):
+                generator = OpenRouterCardGenerator(
+                    api_key="test-key",
+                    model="test-model",
+                    custom_prompt_path=path,
+                )
+                prompt = generator._system_prompt()
+
+            self.assertIn("You create high-quality Anki cards", prompt)
+            self.assertIn("generic output, safety, MathJax, and allowed-tag rules remain authoritative", prompt)
+            self.assertIn("Write concise German cards.", prompt)
+
+            save_custom_prompt("", path)
+            self.assertFalse(path.exists())
+
+    def test_regelungstechnik_prompt_is_available_as_a_packaged_preset(self):
+        prompt = load_regelungstechnik_prompt()
+        self.assertIn("Regelungstechnik specialization", prompt)
+        self.assertIn("zustandsraum", prompt)
+        self.assertIn("configured allowed tags", prompt)
 
     @patch("autoanki.generator.urllib.request.urlopen")
     def test_list_provider_models_parses_openrouter_models(self, urlopen):

@@ -57,6 +57,12 @@ The `.env` file is ignored by Git. Do not commit API keys.
 
 You can switch provider, model, and target card count from the web UI. API keys still stay in `.env`; the UI only writes `AUTOANKI_PROVIDER`, the selected provider's model variable, and `AUTOANKI_TARGET_CARD_COUNT`.
 
+The WebUI also has a collapsed **Custom prompt** section. The generic system
+prompt always remains active; additional instructions are appended from the
+local `data/custom_prompt.txt` file. You can edit those instructions directly,
+return to generic-only generation, or enable the included Regelungstechnik
+preset. The custom file is ignored by Git.
+
 See `docs/providers.md` for OpenAI, Anthropic, and Gemini setup.
 
 Optional subject-specific setup:
@@ -121,7 +127,7 @@ That smoke test calls the configured model, generates real cards, saves them in 
 Generated local files are intentionally ignored:
 
 - `.env`
-- `data/` (cards, pending-generation recovery log, and backups)
+- `data/` (cards, custom prompt, pending-generation recovery log, and backups)
 - `output/` (generated Anki decks)
 - regeneration reports
 - preview HTML files

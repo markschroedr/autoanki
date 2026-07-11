@@ -299,6 +299,40 @@ class WebUiE2ETests(unittest.TestCase):
             self.assertIn('"model-a"', html)
             self.assertIn('"model-b"', html)
 
+    def test_custom_prompt_can_be_saved_preset_and_cleared(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            custom_prompt_path = tmp_path / "custom_prompt.txt"
+            state = WebState(
+                cards_path=tmp_path / "cards.json",
+                output_path=tmp_path / "rt_quickcap.apkg",
+                custom_prompt_path=custom_prompt_path,
+            )
+            server = make_server("127.0.0.1", 0, state)
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            url = f"http://127.0.0.1:{server.server_port}"
+            try:
+                home = self.get(url, "/")
+                self.assertIn("Custom prompt", home)
+                self.assertIn("Generic prompt only", home)
+                self.assertIn('action="/prompt"', home)
+
+                self.post(url, "/prompt", {"action": "save", "custom_prompt": "Write cards in German."})
+                self.assertEqual(custom_prompt_path.read_text(encoding="utf-8").strip(), "Write cards in German.")
+                self.assertIn("Custom instructions active", self.get(url, "/"))
+
+                self.post(url, "/prompt", {"action": "regelungstechnik"})
+                self.assertIn("Regelungstechnik specialization", custom_prompt_path.read_text(encoding="utf-8"))
+
+                self.post(url, "/prompt", {"action": "clear"})
+                self.assertFalse(custom_prompt_path.exists())
+                self.assertIn("Generic prompt only", self.get(url, "/"))
+            finally:
+                server.shutdown()
+                thread.join(timeout=5)
+                server.server_close()
+
     def test_webui_upload_text_file_generates_pending_cards(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

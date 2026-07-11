@@ -17,8 +17,17 @@ from pathlib import Path
 from typing import Any, Callable
 
 from .build_deck import NoUnexportedCards, apkg_output_path, build_deck
-from .generator import OpenRouterCardGenerator, configured_target_card_count, list_provider_models, provider_status, set_provider_model
-from .paths import CARDS_PATH, DECK_PATH
+from .generator import (
+    OpenRouterCardGenerator,
+    configured_target_card_count,
+    list_provider_models,
+    load_custom_prompt,
+    load_regelungstechnik_prompt,
+    provider_status,
+    save_custom_prompt,
+    set_provider_model,
+)
+from .paths import CARDS_PATH, CUSTOM_PROMPT_PATH, DECK_PATH
 from .preview import render_cards_html
 from .quickcap import capture_clipboard, generate_with_note, hydrate_cards
 from .storage import append_cards, load_cards
@@ -43,6 +52,7 @@ def _default_runtime_path(path: str | Path) -> Path:
 class WebState:
     cards_path: Path = CARDS_PATH
     output_path: Path = DECK_PATH
+    custom_prompt_path: Path = CUSTOM_PROMPT_PATH
     generator_factory: Callable[[], Any] = OpenRouterCardGenerator
     capture_fn: Callable[[], dict[str, Any]] = capture_clipboard
     pending: list[dict[str, Any]] = field(default_factory=list)
@@ -132,6 +142,10 @@ def _page(title: str, body: str) -> bytes:
     .provider-panel > summary strong {{ margin-right: auto; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #d99b72; }}
     .provider-summary-meta {{ color: #a9998b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
     .provider-panel-body {{ padding: 4px 18px 18px; border-top: 1px solid rgba(245, 239, 231, 0.075); }}
+    .prompt-panel {{ margin: 10px 0 16px; }}
+    .prompt-panel textarea {{ min-height: 230px; resize: vertical; line-height: 1.45; }}
+    .prompt-panel .prompt-copy {{ display: grid; gap: 7px; padding-top: 14px; }}
+    .prompt-panel .prompt-copy strong {{ color: #dfd2c3; }}
     .provider-row {{ display: grid; grid-template-columns: 88px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(245, 239, 231, 0.08); }}
     .provider-row:first-of-type {{ border-top: 0; }}
     .provider-config {{ display: grid; gap: 9px; margin-top: 14px; }}
@@ -375,6 +389,36 @@ def _provider_panel_html() -> str:
     """
 
 
+def _custom_prompt_panel_html(path: str | Path = CUSTOM_PROMPT_PATH) -> str:
+    custom_prompt = load_custom_prompt(path)
+    status = "Custom instructions active" if custom_prompt else "Generic prompt only"
+    return f"""
+    <details class="provider-panel prompt-panel" data-custom-prompt-panel>
+      <summary>
+        <strong>Custom prompt</strong>
+        <span class="provider-summary-meta">{status}</span>
+      </summary>
+      <div class="provider-panel-body">
+        <div class="prompt-copy">
+          <strong>The generic prompt always stays enabled.</strong>
+          <span class="muted">Add subject-specific guidance here, use the Regelungstechnik preset, or clear the field to return to generic-only generation.</span>
+        </div>
+        <form class="provider-config" method="post" action="/prompt">
+          <label>
+            Additional system-prompt instructions
+            <textarea name="custom_prompt" maxlength="20000" placeholder="Example: Write cards in German and focus on control-engineering distinctions.">{html.escape(custom_prompt)}</textarea>
+          </label>
+          <div class="inline-actions">
+            <button class="small primary" type="submit" name="action" value="save">Save custom prompt</button>
+            <button class="small" type="submit" name="action" value="regelungstechnik">Use Regelungstechnik preset</button>
+            <button class="small" type="submit" name="action" value="clear">Generic only</button>
+          </div>
+        </form>
+      </div>
+    </details>
+    """
+
+
 def _pending_card_editor(card: dict[str, Any], index: int) -> str:
     tags = ",".join(card.get("tags") or [])
     type_options = []
@@ -426,7 +470,7 @@ def _pending_card_editor(card: dict[str, Any], index: int) -> str:
     """
 
 
-def _capture_html() -> str:
+def _capture_html(custom_prompt_path: str | Path = CUSTOM_PROMPT_PATH) -> str:
     return f"""
     <section class="capture-grid">
       <form class="drop-zone" data-drop-zone method="post" action="/upload" enctype="multipart/form-data">
@@ -438,6 +482,7 @@ def _capture_html() -> str:
       </form>
       {_provider_panel_html()}
     </section>
+    {_custom_prompt_panel_html(custom_prompt_path)}
     """
 
 
@@ -546,7 +591,7 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
     {message}
     {error}
     {llm_note}
-    {_capture_html()}
+    {_capture_html(state.custom_prompt_path)}
     {pending_html}
     {saved_html}
     """
@@ -718,6 +763,24 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                 path = set_provider_model(form.get("provider", ""), form.get("model", ""), form.get("target_card_count"))
                 self.state.generator_factory = OpenRouterCardGenerator
                 self.state.message = f"Saved provider settings to {path.name}."
+                self._redirect()
+                return
+            if self.path == "/prompt":
+                form = self._form()
+                action = form.get("action", "save")
+                if action == "regelungstechnik":
+                    value = load_regelungstechnik_prompt()
+                    message = "Enabled the Regelungstechnik custom prompt."
+                elif action == "clear":
+                    value = ""
+                    message = "Cleared custom instructions. Generic prompt only."
+                elif action == "save":
+                    value = form.get("custom_prompt", "")
+                    message = "Saved custom prompt instructions."
+                else:
+                    raise ValueError("Unknown custom prompt action.")
+                save_custom_prompt(value, self.state.custom_prompt_path)
+                self.state.message = message
                 self._redirect()
                 return
             if self.path == "/accept-one":

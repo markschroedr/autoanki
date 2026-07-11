@@ -106,6 +106,11 @@ On Windows, the three `.cmd` launchers start the browser UI, start the CLI, or s
 6. Export the `.apkg`.
 7. Import it into Anki.
 
+Saved cards remain editable in the WebUI. Editing preserves the card ID and
+marks the card for the next incremental export. Deleting removes it from the
+local card database after inline confirmation; it does not remove copies that
+were already imported into Anki.
+
 Use this with material you are allowed to use. AutoAnki does not scrape or bypass study platforms; it only works from your clipboard.
 
 ## Tests

@@ -11,6 +11,7 @@ import urllib.parse
 import urllib.request
 import webbrowser
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -30,7 +31,7 @@ from .generator import (
 from .paths import CARDS_PATH, CUSTOM_PROMPT_PATH, DECK_PATH
 from .preview import render_cards_html
 from .quickcap import capture_clipboard, generate_with_note, hydrate_cards
-from .storage import append_cards, load_cards
+from .storage import append_cards, load_cards, save_cards
 from .validate import configured_tags, validate_cards
 
 
@@ -165,6 +166,17 @@ def _page(title: str, body: str) -> bytes:
     .pending-fields label:nth-child(2) {{ grid-column: span 2; }}
     .pending-card textarea {{ min-height: 92px; resize: vertical; }}
     .pending-card footer {{ display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }}
+    .saved-card-actions {{ display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 8px; margin-top: 14px; }}
+    .saved-edit > summary, .saved-delete > summary {{ border: 1px solid rgba(245, 239, 231, 0.14); border-radius: 6px; padding: 6px 9px; color: #f5efe7; cursor: pointer; list-style: none; font-size: 13px; }}
+    .saved-edit > summary::-webkit-details-marker, .saved-delete > summary::-webkit-details-marker {{ display: none; }}
+    .saved-edit > summary:hover {{ border-color: rgba(244, 171, 119, 0.42); background: rgba(245, 239, 231, 0.06); }}
+    .saved-delete > summary {{ color: #ffe9e4; border-color: rgba(240, 128, 111, 0.32); background: rgba(107, 48, 43, 0.25); }}
+    .saved-delete > summary:hover {{ border-color: rgba(240, 128, 111, 0.58); background: rgba(107, 48, 43, 0.42); }}
+    .saved-edit[open], .saved-delete[open] {{ grid-column: 1 / -1; min-width: min(720px, calc(100vw - 80px)); }}
+    .saved-edit-form {{ display: grid; gap: 10px; margin-top: 10px; padding-top: 12px; border-top: 1px solid rgba(245, 239, 231, 0.1); }}
+    .saved-edit-form .inline-actions {{ display: flex; justify-content: flex-end; }}
+    .saved-delete-confirm {{ display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; margin-top: 10px; padding: 12px; border: 1px solid rgba(240, 128, 111, 0.28); border-radius: 7px; background: rgba(107, 48, 43, 0.18); }}
+    .saved-delete-confirm span {{ margin-right: auto; color: #ffd8d0; }}
     .front {{ font-size: 18px; line-height: 1.48; margin-bottom: 12px; }}
     .back {{ border-top: 1px solid rgba(245, 239, 231, 0.1); padding-top: 12px; color: #dfd2c3; line-height: 1.48; }}
     .cloze-answer {{ background: rgba(217, 155, 114, 0.22); color: #fff3e8; border: 1px solid rgba(217, 155, 114, 0.55); border-radius: 4px; padding: 0 4px; }}
@@ -284,6 +296,61 @@ def _recent_cards(cards: list[dict[str, Any]], offset: int, limit: int = RECENT_
     return page, has_newer, has_older
 
 
+def _saved_card_actions_html(card: dict[str, Any], offset: int) -> str:
+    card_id = str(card.get("id") or "")
+    if not card_id:
+        return '<div class="warnings">This legacy card has no ID and cannot be edited safely.</div>'
+    tags = ",".join(card.get("tags") or [])
+    type_options = []
+    for card_type in ("basic", "cloze"):
+        selected = " selected" if card.get("type") == card_type else ""
+        type_options.append(f'<option value="{card_type}"{selected}>{card_type}</option>')
+    return f"""
+    <footer class="saved-card-actions">
+      <details class="saved-edit">
+        <summary>Edit</summary>
+        <form class="saved-edit-form" method="post" action="/saved/update">
+          <input type="hidden" name="card_id" value="{html.escape(card_id)}">
+          <input type="hidden" name="offset" value="{offset}">
+          <div class="pending-fields">
+            <label>
+              Type
+              <select name="type">{''.join(type_options)}</select>
+            </label>
+            <label>
+              Tags
+              <input name="tags" value="{html.escape(tags)}" aria-label="saved card tags">
+            </label>
+            <label>
+              Front
+              <textarea name="front">{html.escape(card.get("front", ""))}</textarea>
+            </label>
+            <label>
+              Back
+              <textarea name="back">{html.escape(card.get("back", ""))}</textarea>
+            </label>
+          </div>
+          <div class="inline-actions">
+            <button class="small primary" type="submit">Save changes</button>
+          </div>
+        </form>
+      </details>
+      <details class="saved-delete">
+        <summary>Delete</summary>
+        <div class="saved-delete-confirm">
+          <span>Delete this local saved card permanently? Existing Anki imports are not changed.</span>
+          <button class="small" type="button" onclick="this.closest('details').removeAttribute('open')">Cancel</button>
+          <form method="post" action="/saved/delete">
+            <input type="hidden" name="card_id" value="{html.escape(card_id)}">
+            <input type="hidden" name="offset" value="{offset}">
+            <button class="small danger" type="submit">Yes, delete</button>
+          </form>
+        </div>
+      </details>
+    </footer>
+    """
+
+
 def _recent_cards_html(saved_cards: list[dict[str, Any]], offset: int) -> str:
     page_cards, has_newer, has_older = _recent_cards(saved_cards, offset)
     if not saved_cards:
@@ -306,7 +373,7 @@ def _recent_cards_html(saved_cards: list[dict[str, Any]], offset: int) -> str:
         <h2>Saved cards</h2>
         <span>{start}-{end} of {len(saved_cards)} / newest first</span>
       </div>
-      {render_cards_html(page_cards)}
+      {render_cards_html(page_cards, start_index=start, card_footer=lambda card: _saved_card_actions_html(card, offset))}
       {nav_html}
     </section>
     """
@@ -695,6 +762,17 @@ class QuickcapHandler(BaseHTTPRequestHandler):
             }
         )
 
+    def _saved_card_index(self, cards: list[dict[str, Any]], card_id: str) -> int:
+        for index, card in enumerate(cards):
+            if str(card.get("id") or "") == card_id:
+                return index
+        raise ValueError("Saved card was not found. Reload the page and try again.")
+
+    def _saved_card_redirect(self, requested_offset: str, card_count: int) -> None:
+        offset = _parse_offset(requested_offset)
+        last_page_offset = ((card_count - 1) // RECENT_PAGE_SIZE) * RECENT_PAGE_SIZE if card_count else 0
+        self._redirect(f"/?offset={min(offset, last_page_offset)}")
+
     def do_GET(self) -> None:
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path == "/":
@@ -793,6 +871,37 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                     total = append_cards([card], self.state.cards_path)
                     self.state.message = f"Saved 1 card. Total: {len(total)}."
                 self._redirect()
+                return
+            if self.path == "/saved/update":
+                form = self._form()
+                cards = load_cards(self.state.cards_path)
+                index = self._saved_card_index(cards, form.get("card_id", ""))
+                tags = [tag.strip() for tag in form.get("tags", "").split(",") if tag.strip()]
+                updated = {
+                    **cards[index],
+                    "type": form.get("type", "basic"),
+                    "front": form.get("front", ""),
+                    "back": form.get("back", ""),
+                    "tags": tags,
+                    "updated_at": datetime.now(timezone.utc).isoformat(),
+                }
+                updated.pop("exported_at", None)
+                result = validate_cards([updated], allowed_tags=set(tags))[0]
+                if not result.ok:
+                    raise ValueError("Could not save card: " + "; ".join(result.errors))
+                cards[index] = updated
+                save_cards(cards, self.state.cards_path)
+                self.state.message = "Updated saved card. It will be included in the next new-card export."
+                self._saved_card_redirect(form.get("offset", "0"), len(cards))
+                return
+            if self.path == "/saved/delete":
+                form = self._form()
+                cards = load_cards(self.state.cards_path)
+                index = self._saved_card_index(cards, form.get("card_id", ""))
+                cards.pop(index)
+                save_cards(cards, self.state.cards_path)
+                self.state.message = f"Deleted saved card. Total: {len(cards)}."
+                self._saved_card_redirect(form.get("offset", "0"), len(cards))
                 return
             if self.path == "/discard":
                 form = self._form()

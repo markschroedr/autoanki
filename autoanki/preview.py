@@ -86,9 +86,13 @@ def _card_image_html(card: dict[str, Any]) -> str:
     return f'<figure><img src="data:image/png;base64,{image_b64}" alt="clipboard image"></figure>'
 
 
-def render_cards_html(cards: list[dict[str, Any]]) -> str:
+def render_cards_html(
+    cards: list[dict[str, Any]],
+    start_index: int = 1,
+    card_footer: Callable[[dict[str, Any]], str] | None = None,
+) -> str:
     rendered_cards = []
-    for index, card in enumerate(cards, start=1):
+    for index, card in enumerate(cards, start=start_index):
         status = "ok" if card.get("render_ok") else "bad"
         errors = card.get("validation_errors") or []
         warnings = card.get("validation_warnings") or []
@@ -103,6 +107,7 @@ def render_cards_html(cards: list[dict[str, Any]]) -> str:
         tags = ", ".join(card.get("tags") or [])
         front = _render_text(card.get("front") or "")
         back = _render_text(card.get("back") or "")
+        footer_html = card_footer(card) if card_footer else ""
         rendered_cards.append(
             f"""
             <article class="card {status}">
@@ -115,6 +120,7 @@ def render_cards_html(cards: list[dict[str, Any]]) -> str:
               {_card_image_html(card)}
               {error_html}
               {warning_html}
+              {footer_html}
             </article>
             """
         )

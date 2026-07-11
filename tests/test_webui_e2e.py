@@ -164,6 +164,72 @@ class WebUiE2ETests(unittest.TestCase):
             self.assertIn("front 0", older_html)
             self.assertIn("Newer", older_html)
 
+    def test_saved_cards_can_be_edited_and_deleted_by_stable_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            cards = []
+            for index in range(12):
+                cards.append(
+                    {
+                        "id": str(index),
+                        "created": f"2026-05-24T10:{index:02d}:00+00:00",
+                        "type": "basic",
+                        "front": f"front {index}",
+                        "back": f"back {index}",
+                        "tags": ["bode"],
+                        "source": {"text": f"source {index}", "image_b64": None},
+                        "render_ok": True,
+                        "exported_at": "2026-05-25T10:00:00+00:00",
+                    }
+                )
+            cards_path = tmp_path / "cards.json"
+            save_cards(cards, cards_path)
+            state = WebState(cards_path=cards_path, output_path=tmp_path / "autoanki.apkg")
+            server = make_server("127.0.0.1", 0, state)
+            thread = threading.Thread(target=server.serve_forever)
+            thread.start()
+            url = f"http://127.0.0.1:{server.server_port}"
+            try:
+                home = self.get(url, "/")
+                self.assertEqual(home.count('action="/saved/update"'), 10)
+                self.assertEqual(home.count('action="/saved/delete"'), 10)
+                self.assertIn("Delete this local saved card permanently?", home)
+                self.assertIn("Existing Anki imports are not changed", home)
+                self.assertIn("Yes, delete", home)
+                self.assertIn("saved-delete-confirm", home)
+                self.assertNotIn("return confirm(", home)
+
+                self.post(
+                    url,
+                    "/saved/update",
+                    {
+                        "card_id": "1",
+                        "offset": "10",
+                        "type": "cloze",
+                        "front": "Edited {{c1::saved}} card",
+                        "back": "Edited back",
+                        "tags": "bode,grundlagen",
+                    },
+                )
+                saved = load_cards(cards_path)
+                edited = next(card for card in saved if card["id"] == "1")
+                self.assertEqual(edited["type"], "cloze")
+                self.assertEqual(edited["front"], "Edited {{c1::saved}} card")
+                self.assertEqual(edited["tags"], ["bode", "grundlagen"])
+                self.assertEqual(edited["source"]["text"], "source 1")
+                self.assertIn("updated_at", edited)
+                self.assertNotIn("exported_at", edited)
+
+                self.post(url, "/saved/delete", {"card_id": "0", "offset": "10"})
+                saved = load_cards(cards_path)
+                self.assertEqual(len(saved), 11)
+                self.assertNotIn("0", {card["id"] for card in saved})
+                self.assertIn("Edited", self.get(url, "/?offset=10"))
+            finally:
+                server.shutdown()
+                thread.join(timeout=5)
+                server.server_close()
+
     def test_webui_shows_llm_note_without_saving_cards(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

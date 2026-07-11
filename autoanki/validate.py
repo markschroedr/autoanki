@@ -60,7 +60,11 @@ def _validate_katex(snippet: str) -> tuple[bool | None, str | None]:
     return False, result.stderr.strip() or "katex render failed"
 
 
-def validate_card(card: dict[str, Any], check_math: bool = True) -> ValidationResult:
+def validate_card(
+    card: dict[str, Any],
+    check_math: bool = True,
+    allowed_tags: set[str] | None = None,
+) -> ValidationResult:
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -82,7 +86,8 @@ def validate_card(card: dict[str, Any], check_math: bool = True) -> ValidationRe
         errors.append("tags must be a list")
     else:
         clean_tags = [tag for tag in tags if isinstance(tag, str)]
-        unknown = [tag for tag in clean_tags if tag not in configured_tags()]
+        valid_tags = configured_tags() if allowed_tags is None else allowed_tags
+        unknown = [tag for tag in clean_tags if tag not in valid_tags]
         if unknown:
             errors.append(f"unknown tags: {', '.join(unknown)}")
         if len(clean_tags) > 2:
@@ -102,10 +107,14 @@ def validate_card(card: dict[str, Any], check_math: bool = True) -> ValidationRe
     return ValidationResult(ok=not errors, errors=errors, warnings=warnings)
 
 
-def validate_cards(cards: list[dict[str, Any]], check_math: bool = True) -> list[ValidationResult]:
+def validate_cards(
+    cards: list[dict[str, Any]],
+    check_math: bool = True,
+    allowed_tags: set[str] | None = None,
+) -> list[ValidationResult]:
     results = []
     for card in cards:
-        result = validate_card(card, check_math=check_math)
+        result = validate_card(card, check_math=check_math, allowed_tags=allowed_tags)
         card["render_ok"] = result.ok
         card["validation_errors"] = result.errors
         card["validation_warnings"] = result.warnings

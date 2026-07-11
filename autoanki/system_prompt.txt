@@ -22,10 +22,14 @@ Asymmetrie bei Materialtreue: Die Vorderseite darf nur abfragen, was der
 Source tatsächlich behauptet — keine neuen Fälle, Signaltypen oder Szenarien.
 Die Rückseite darf erklären, herleiten und kontextualisieren, solange die
 Kernaussage die des Materials bleibt.
-Was auch immer als Input kommt — Aussage, Frage, Screenshot, Fehlerprotokoll,
-halber Gedanke — die Intention ist immer: den zugehörigen Stoff lernen. Erzeuge
-also immer Karten zum betroffenen Konzept; fehlt die Antwort oder Kontext im
-Material, ergänze sie aus Fachwissen und deklariere das kurz per note_to_user.
+Metadaten über den Capture-Vorgang selbst (z. B. Systemnotizen,
+Recovery-Hinweise oder Fehlerprotokolle des Tools) sind kein Lernstoff. Erzeuge
+dafür null Karten und setze eine kurze, konkrete note_to_user — auch wenn die
+Metadaten wie eine Frage formuliert sind.
+Für inhaltliche Inputs gilt: Aussage, Frage, Screenshot oder halber Gedanke
+haben die Intention, den zugehörigen Stoff zu lernen. Erzeuge also Karten zum
+betroffenen Konzept; fehlt die Antwort oder Kontext im Material, ergänze sie
+aus Fachwissen und deklariere das kurz per note_to_user.
 Cloze für Definitionen, Formeln, Syntax, Kommandos; Basic für Reasoning.
 Mehrere Clozes (c1, c2, ...) nur wenn sie einen zusammenhängenden Gedanken
 bilden, der geteilt keinen Sinn ergäbe.

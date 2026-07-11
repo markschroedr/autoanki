@@ -78,11 +78,15 @@ def _page(title: str, body: str) -> bytes:
     :root {{
       color-scheme: dark;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #12100e;
-      color: #f4eee7;
-      --surface: rgba(27, 24, 21, 0.72);
-      --ochre: #d99b72;
-      --ochre-strong: #bd7652;
+      background: #121212;
+      color: #f0ede9;
+      --surface: rgba(26, 26, 25, 0.78);
+      --text: #f0ede9;
+      --text-soft: #d6d1cb;
+      --muted: #aaa6a0;
+      --line: rgba(240, 237, 233, 0.11);
+      --ochre: #c78f6b;
+      --ochre-strong: #ad6847;
     }}
     * {{ box-sizing: border-box; }}
     body {{
@@ -91,9 +95,9 @@ def _page(title: str, body: str) -> bytes:
       display: flow-root;
       overflow-x: hidden;
       background:
-        radial-gradient(circle at 12% -8%, rgba(194, 116, 73, 0.105), transparent 34rem),
-        linear-gradient(145deg, #12100e 0%, #171411 54%, #11100f 100%);
-      color: #f5efe7;
+        radial-gradient(circle at 12% -8%, rgba(173, 104, 71, 0.065), transparent 34rem),
+        linear-gradient(145deg, #121212 0%, #171716 54%, #111212 100%);
+      color: var(--text);
     }}
     main {{ width: min(1160px, calc(100vw - 48px)); margin: 38px auto 72px; }}
     header.top {{ display: flex; align-items: center; justify-content: space-between; gap: 30px; margin-bottom: 26px; }}
@@ -101,10 +105,10 @@ def _page(title: str, body: str) -> bytes:
     .actions {{ display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }}
     button, a.button {{
       appearance: none;
-      border: 1px solid rgba(245, 239, 231, 0.1);
+      border: 1px solid var(--line);
       border-radius: 8px;
       background: rgba(245, 239, 231, 0.035);
-      color: #f8f1e8;
+      color: var(--text);
       min-height: 38px;
       padding: 8px 13px;
       font: inherit;
@@ -113,15 +117,15 @@ def _page(title: str, body: str) -> bytes:
       cursor: pointer;
       transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
     }}
-    button:hover, a.button:hover {{ border-color: rgba(244, 171, 119, 0.42); background: rgba(245, 239, 231, 0.06); transform: translateY(-1px); }}
-    button:focus-visible, a.button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {{ outline: 2px solid rgba(217, 155, 114, 0.72); outline-offset: 2px; }}
-    button.primary {{ background: var(--ochre-strong); border-color: #d08b68; color: #1d110c; font-weight: 700; }}
+    button:hover, a.button:hover {{ border-color: rgba(199, 143, 107, 0.48); background: rgba(245, 245, 245, 0.065); transform: translateY(-1px); }}
+    button:focus-visible, a.button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {{ outline: 2px solid rgba(199, 143, 107, 0.72); outline-offset: 2px; }}
+    button.primary {{ background: var(--ochre-strong); border-color: #c27b59; color: #16110e; font-weight: 700; }}
     button.danger {{ background: rgba(107, 48, 43, 0.42); border-color: rgba(240, 128, 111, 0.32); color: #ffe9e4; }}
     button.small {{ min-height: 32px; padding: 5px 10px; font-size: 13px; }}
     h2 {{ font-size: 14px; text-transform: uppercase; letter-spacing: 0.105em; color: var(--ochre); margin: 32px 0 12px; }}
     .section-head {{ display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-top: 32px; }}
     .section-head h2 {{ margin: 0 0 10px; }}
-    .section-head span {{ color: #9e8e80; font-size: 14px; }}
+    .section-head span {{ color: var(--muted); font-size: 14px; }}
     .pager {{ margin-top: 12px; justify-content: flex-end; }}
     .notice, .error {{ border-radius: 6px; padding: 10px 12px; margin: 12px 0; }}
     .llm-note {{ border-radius: 8px; padding: 12px 14px; margin: 12px 0; background: rgba(217, 155, 114, 0.14); border: 1px solid rgba(217, 155, 114, 0.35); }}
@@ -130,9 +134,9 @@ def _page(title: str, body: str) -> bytes:
     .async-status {{ position: fixed; right: 18px; bottom: 18px; z-index: 20; max-width: min(380px, calc(100vw - 36px)); border: 1px solid rgba(217, 155, 114, 0.42); border-radius: 8px; padding: 10px 13px; background: rgba(38, 27, 21, 0.96); color: #f5efe7; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.3); }}
     .async-status.error {{ border-color: rgba(240, 128, 111, 0.55); color: #ffd8d0; }}
     form.async-busy {{ opacity: 0.62; pointer-events: none; }}
-    .summary {{ color: #b8a99b; margin: 12px 0 0; max-width: 610px; line-height: 1.5; }}
+    .summary {{ color: var(--muted); margin: 12px 0 0; max-width: 610px; line-height: 1.5; }}
     .surface, .card, .empty, .drop-zone, .provider-panel {{
-      border: 1px solid rgba(245, 239, 231, 0.075);
+      border: 1px solid var(--line);
       border-radius: 10px;
       background: var(--surface);
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.11);
@@ -142,7 +146,7 @@ def _page(title: str, body: str) -> bytes:
     .drop-zone {{ min-height: 172px; padding: 28px; display: grid; place-items: center; text-align: center; position: relative; overflow: hidden; }}
     .drop-zone.dragging {{ border-color: #c58361; background: rgba(173, 105, 72, 0.08); }}
     .drop-zone strong {{ display: block; font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weight: 400; margin-bottom: 9px; }}
-    .drop-zone p, .muted {{ color: #a9998b; margin: 0; line-height: 1.5; }}
+    .drop-zone p, .muted {{ color: var(--muted); margin: 0; line-height: 1.5; }}
     .drop-zone input {{ position: absolute; inset: 0; opacity: 0; cursor: pointer; }}
     .provider-panel {{ overflow: hidden; }}
     .provider-panel > summary {{ display: flex; min-height: 70px; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; cursor: pointer; list-style: none; }}
@@ -150,17 +154,17 @@ def _page(title: str, body: str) -> bytes:
     .provider-panel > summary::before {{ content: "›"; color: #d99b72; font-size: 22px; line-height: 1; transition: transform 140ms ease; }}
     .provider-panel[open] > summary::before {{ transform: rotate(90deg); }}
     .provider-panel > summary strong {{ margin-right: auto; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #d99b72; }}
-    .provider-summary-meta {{ color: #a9998b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+    .provider-summary-meta {{ color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
     .provider-panel-body {{ padding: 4px 18px 18px; border-top: 1px solid rgba(245, 239, 231, 0.075); }}
     .prompt-panel {{ margin: 12px 0 20px; }}
     .prompt-panel > summary {{ min-height: 56px; }}
     .prompt-panel textarea {{ min-height: 230px; resize: vertical; line-height: 1.45; }}
     .prompt-panel .prompt-copy {{ display: grid; gap: 7px; padding-top: 14px; }}
-    .prompt-panel .prompt-copy strong {{ color: #dfd2c3; }}
+    .prompt-panel .prompt-copy strong {{ color: var(--text-soft); }}
     .provider-row {{ display: grid; grid-template-columns: 88px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(245, 239, 231, 0.08); }}
     .provider-row:first-of-type {{ border-top: 0; }}
     .provider-config {{ display: grid; gap: 9px; margin-top: 14px; }}
-    .provider-config label {{ display: grid; gap: 5px; color: #a9998b; font-size: 13px; }}
+    .provider-config label {{ display: grid; gap: 5px; color: var(--muted); font-size: 13px; }}
     .provider-config .inline-actions {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
     .model-status {{ min-height: 20px; color: #8f8174; font-size: 13px; }}
     .pill {{ display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; font-size: 12px; border: 1px solid rgba(245, 239, 231, 0.14); color: #cbbcac; }}
@@ -168,11 +172,11 @@ def _page(title: str, body: str) -> bytes:
     .pill.missing {{ color: #ffb5a6; border-color: rgba(255, 181, 166, 0.35); }}
     .card {{ padding: 18px 20px; margin: 12px 0; }}
     .card.bad {{ border-color: rgba(240, 128, 111, 0.5); box-shadow: inset 4px 0 0 #b95d4d, 0 14px 44px rgba(0, 0, 0, 0.12); }}
-    .card header {{ display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 14px; color: #aa9b8e; }}
+    .card header {{ display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 14px; color: var(--muted); }}
     .pending-card {{ display: grid; gap: 12px; }}
     .pending-card header {{ align-items: center; margin-bottom: 0; }}
     .pending-fields {{ display: grid; grid-template-columns: 100px minmax(0, 1fr) 190px; gap: 8px; align-items: start; }}
-    .pending-fields label {{ display: grid; gap: 5px; color: #a9998b; font-size: 13px; }}
+    .pending-fields label {{ display: grid; gap: 5px; color: var(--muted); font-size: 13px; }}
     .pending-fields label:nth-child(2) {{ grid-column: span 2; }}
     .pending-content-field {{ grid-column: span 2; }}
     .field-preview {{ min-height: 62px; padding: 12px; border: 1px solid rgba(245, 239, 231, 0.1); border-radius: 7px; background: rgba(18, 15, 13, 0.52); color: #f5efe7; line-height: 1.5; }}
@@ -196,15 +200,15 @@ def _page(title: str, body: str) -> bytes:
     .saved-delete-confirm {{ display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; margin-top: 10px; padding: 12px; border: 1px solid rgba(240, 128, 111, 0.28); border-radius: 7px; background: rgba(107, 48, 43, 0.18); }}
     .saved-delete-confirm span {{ margin-right: auto; color: #ffd8d0; }}
     .front {{ max-width: 92ch; font-size: 17px; line-height: 1.56; margin-bottom: 14px; }}
-    .back {{ max-width: 92ch; border-top: 1px solid rgba(245, 239, 231, 0.1); padding-top: 14px; color: #dfd2c3; line-height: 1.56; }}
+    .back {{ max-width: 92ch; border-top: 1px solid var(--line); padding-top: 14px; color: var(--text-soft); line-height: 1.56; }}
     .cloze-answer {{ background: rgba(217, 155, 114, 0.22); color: #fff3e8; border: 1px solid rgba(217, 155, 114, 0.55); border-radius: 4px; padding: 0 4px; }}
     .cloze-answer span:first-child {{ font-size: 12px; font-weight: 700; margin-right: 4px; color: #d99b72; }}
     .cloze-hint {{ color: #b8a99b; }}
     .errors {{ color: #ff9f8d; }}
     .warnings {{ color: #d99b72; }}
-    textarea, input, select {{ width: 100%; border-radius: 8px; border: 1px solid rgba(245, 239, 231, 0.14); background: rgba(18, 15, 13, 0.78); color: #f5efe7; padding: 10px; font: inherit; }}
-    textarea:focus, input:focus, select:focus {{ border-color: rgba(217, 155, 114, 0.48); }}
-    .empty {{ border-style: dashed; padding: 24px 22px; color: #a9998b; }}
+    textarea, input, select {{ width: 100%; border-radius: 8px; border: 1px solid rgba(240, 237, 233, 0.16); background: rgba(16, 16, 16, 0.78); color: var(--text); padding: 10px; font: inherit; }}
+    textarea:focus, input:focus, select:focus {{ border-color: rgba(199, 143, 107, 0.52); }}
+    .empty {{ border-style: dashed; padding: 24px 22px; color: var(--muted); }}
     .help-page {{ display: grid; gap: 18px; max-width: 920px; }}
     .help-page .surface {{ padding: 22px; }}
     .help-page h1 {{ margin-bottom: 12px; }}

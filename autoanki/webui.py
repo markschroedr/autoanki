@@ -78,29 +78,33 @@ def _page(title: str, body: str) -> bytes:
     :root {{
       color-scheme: dark;
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: #15120f;
-      color: #f5efe7;
+      background: #12100e;
+      color: #f4eee7;
+      --surface: rgba(27, 24, 21, 0.72);
+      --ochre: #d99b72;
+      --ochre-strong: #bd7652;
     }}
     * {{ box-sizing: border-box; }}
     body {{
       margin: 0;
       min-height: 100vh;
       background:
-        radial-gradient(circle at top left, rgba(194, 116, 73, 0.07), transparent 30rem),
-        linear-gradient(135deg, #141210 0%, #181512 56%, #141312 100%);
+        radial-gradient(circle at 12% -8%, rgba(194, 116, 73, 0.105), transparent 34rem),
+        linear-gradient(145deg, #12100e 0%, #171411 54%, #11100f 100%);
       color: #f5efe7;
     }}
-    main {{ width: min(1080px, calc(100vw - 32px)); margin: 40px auto 60px; }}
-    header.top {{ display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin-bottom: 22px; }}
-    h1 {{ font-family: Georgia, "Times New Roman", serif; font-size: clamp(34px, 4.6vw, 54px); font-weight: 400; line-height: 1; margin: 0; letter-spacing: 0; }}
-    .actions {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
+    main {{ width: min(1160px, calc(100vw - 48px)); margin: 38px auto 72px; }}
+    header.top {{ display: flex; align-items: center; justify-content: space-between; gap: 30px; margin-bottom: 26px; }}
+    h1 {{ font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 4.6vw, 56px); font-weight: 400; line-height: 0.98; margin: 0; letter-spacing: -0.025em; text-wrap: balance; }}
+    .actions {{ display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; align-items: center; }}
     button, a.button {{
       appearance: none;
       border: 1px solid rgba(245, 239, 231, 0.1);
-      border-radius: 7px;
+      border-radius: 8px;
       background: rgba(245, 239, 231, 0.035);
       color: #f8f1e8;
-      padding: 9px 12px;
+      min-height: 38px;
+      padding: 8px 13px;
       font: inherit;
       font-size: 14px;
       text-decoration: none;
@@ -108,11 +112,12 @@ def _page(title: str, body: str) -> bytes:
       transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
     }}
     button:hover, a.button:hover {{ border-color: rgba(244, 171, 119, 0.42); background: rgba(245, 239, 231, 0.06); transform: translateY(-1px); }}
-    button.primary {{ background: #ad6948; border-color: #c58361; color: #20130d; font-weight: 700; }}
+    button:focus-visible, a.button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {{ outline: 2px solid rgba(217, 155, 114, 0.72); outline-offset: 2px; }}
+    button.primary {{ background: var(--ochre-strong); border-color: #d08b68; color: #1d110c; font-weight: 700; }}
     button.danger {{ background: rgba(107, 48, 43, 0.42); border-color: rgba(240, 128, 111, 0.32); color: #ffe9e4; }}
-    button.small {{ padding: 6px 9px; font-size: 13px; }}
-    h2 {{ font-size: 15px; text-transform: uppercase; letter-spacing: 0.08em; color: #d99b72; margin: 26px 0 12px; }}
-    .section-head {{ display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-top: 26px; }}
+    button.small {{ min-height: 32px; padding: 5px 10px; font-size: 13px; }}
+    h2 {{ font-size: 14px; text-transform: uppercase; letter-spacing: 0.105em; color: var(--ochre); margin: 32px 0 12px; }}
+    .section-head {{ display: flex; justify-content: space-between; align-items: baseline; gap: 16px; margin-top: 32px; }}
     .section-head h2 {{ margin: 0 0 10px; }}
     .section-head span {{ color: #9e8e80; font-size: 14px; }}
     .pager {{ margin-top: 12px; justify-content: flex-end; }}
@@ -126,26 +131,27 @@ def _page(title: str, body: str) -> bytes:
     .summary {{ color: #b8a99b; margin: 12px 0 0; max-width: 610px; line-height: 1.5; }}
     .surface, .card, .empty, .drop-zone, .provider-panel {{
       border: 1px solid rgba(245, 239, 231, 0.075);
-      border-radius: 8px;
-      background: rgba(27, 24, 21, 0.5);
-      box-shadow: 0 14px 44px rgba(0, 0, 0, 0.12);
+      border-radius: 10px;
+      background: var(--surface);
+      box-shadow: 0 18px 48px rgba(0, 0, 0, 0.11);
       backdrop-filter: blur(8px);
     }}
-    .capture-grid {{ display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr); gap: 14px; align-items: start; margin: 12px 0 10px; }}
-    .drop-zone {{ min-height: 168px; padding: 24px; display: grid; place-items: center; text-align: center; position: relative; overflow: hidden; }}
+    .capture-grid {{ display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.75fr); gap: 14px; align-items: stretch; margin: 12px 0 10px; }}
+    .drop-zone {{ min-height: 172px; padding: 28px; display: grid; place-items: center; text-align: center; position: relative; overflow: hidden; }}
     .drop-zone.dragging {{ border-color: #c58361; background: rgba(173, 105, 72, 0.08); }}
-    .drop-zone strong {{ display: block; font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 400; margin-bottom: 9px; }}
+    .drop-zone strong {{ display: block; font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weight: 400; margin-bottom: 9px; }}
     .drop-zone p, .muted {{ color: #a9998b; margin: 0; line-height: 1.5; }}
     .drop-zone input {{ position: absolute; inset: 0; opacity: 0; cursor: pointer; }}
     .provider-panel {{ overflow: hidden; }}
-    .provider-panel > summary {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }}
+    .provider-panel > summary {{ display: flex; min-height: 70px; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; cursor: pointer; list-style: none; }}
     .provider-panel > summary::-webkit-details-marker {{ display: none; }}
     .provider-panel > summary::before {{ content: "›"; color: #d99b72; font-size: 22px; line-height: 1; transition: transform 140ms ease; }}
     .provider-panel[open] > summary::before {{ transform: rotate(90deg); }}
     .provider-panel > summary strong {{ margin-right: auto; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #d99b72; }}
     .provider-summary-meta {{ color: #a9998b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
     .provider-panel-body {{ padding: 4px 18px 18px; border-top: 1px solid rgba(245, 239, 231, 0.075); }}
-    .prompt-panel {{ margin: 10px 0 16px; }}
+    .prompt-panel {{ margin: 12px 0 20px; }}
+    .prompt-panel > summary {{ min-height: 56px; }}
     .prompt-panel textarea {{ min-height: 230px; resize: vertical; line-height: 1.45; }}
     .prompt-panel .prompt-copy {{ display: grid; gap: 7px; padding-top: 14px; }}
     .prompt-panel .prompt-copy strong {{ color: #dfd2c3; }}
@@ -158,7 +164,7 @@ def _page(title: str, body: str) -> bytes:
     .pill {{ display: inline-flex; align-items: center; border-radius: 999px; padding: 3px 8px; font-size: 12px; border: 1px solid rgba(245, 239, 231, 0.14); color: #cbbcac; }}
     .pill.active {{ color: #26150e; background: #d99b72; border-color: #d99b72; }}
     .pill.missing {{ color: #ffb5a6; border-color: rgba(255, 181, 166, 0.35); }}
-    .card {{ padding: 17px; margin: 12px 0; }}
+    .card {{ padding: 18px 20px; margin: 12px 0; }}
     .card.bad {{ border-color: rgba(240, 128, 111, 0.5); box-shadow: inset 4px 0 0 #b95d4d, 0 14px 44px rgba(0, 0, 0, 0.12); }}
     .card header {{ display: flex; justify-content: space-between; gap: 12px; margin-bottom: 12px; font-size: 14px; color: #aa9b8e; }}
     .pending-card {{ display: grid; gap: 12px; }}
@@ -176,7 +182,7 @@ def _page(title: str, body: str) -> bytes:
     .field-source textarea {{ margin-top: 7px; min-height: 108px; resize: vertical; }}
     .pending-card textarea {{ min-height: 92px; resize: vertical; }}
     .pending-card footer {{ display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }}
-    .saved-card-actions {{ display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 8px; margin-top: 14px; }}
+    .saved-card-actions {{ display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(245, 239, 231, 0.075); }}
     .saved-edit > summary, .saved-delete > summary {{ border: 1px solid rgba(245, 239, 231, 0.14); border-radius: 6px; padding: 6px 9px; color: #f5efe7; cursor: pointer; list-style: none; font-size: 13px; }}
     .saved-edit > summary::-webkit-details-marker, .saved-delete > summary::-webkit-details-marker {{ display: none; }}
     .saved-edit > summary:hover {{ border-color: rgba(244, 171, 119, 0.42); background: rgba(245, 239, 231, 0.06); }}
@@ -187,15 +193,16 @@ def _page(title: str, body: str) -> bytes:
     .saved-edit-form .inline-actions {{ display: flex; justify-content: flex-end; }}
     .saved-delete-confirm {{ display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 9px; margin-top: 10px; padding: 12px; border: 1px solid rgba(240, 128, 111, 0.28); border-radius: 7px; background: rgba(107, 48, 43, 0.18); }}
     .saved-delete-confirm span {{ margin-right: auto; color: #ffd8d0; }}
-    .front {{ font-size: 18px; line-height: 1.48; margin-bottom: 12px; }}
-    .back {{ border-top: 1px solid rgba(245, 239, 231, 0.1); padding-top: 12px; color: #dfd2c3; line-height: 1.48; }}
+    .front {{ max-width: 92ch; font-size: 17px; line-height: 1.56; margin-bottom: 14px; }}
+    .back {{ max-width: 92ch; border-top: 1px solid rgba(245, 239, 231, 0.1); padding-top: 14px; color: #dfd2c3; line-height: 1.56; }}
     .cloze-answer {{ background: rgba(217, 155, 114, 0.22); color: #fff3e8; border: 1px solid rgba(217, 155, 114, 0.55); border-radius: 4px; padding: 0 4px; }}
     .cloze-answer span:first-child {{ font-size: 12px; font-weight: 700; margin-right: 4px; color: #d99b72; }}
     .cloze-hint {{ color: #b8a99b; }}
     .errors {{ color: #ff9f8d; }}
     .warnings {{ color: #d99b72; }}
-    textarea, input, select {{ width: 100%; border-radius: 7px; border: 1px solid rgba(245, 239, 231, 0.14); background: rgba(18, 15, 13, 0.78); color: #f5efe7; padding: 9px; font: inherit; }}
-    .empty {{ border-style: dashed; padding: 22px; color: #a9998b; }}
+    textarea, input, select {{ width: 100%; border-radius: 8px; border: 1px solid rgba(245, 239, 231, 0.14); background: rgba(18, 15, 13, 0.78); color: #f5efe7; padding: 10px; font: inherit; }}
+    textarea:focus, input:focus, select:focus {{ border-color: rgba(217, 155, 114, 0.48); }}
+    .empty {{ border-style: dashed; padding: 24px 22px; color: #a9998b; }}
     .help-page {{ display: grid; gap: 18px; max-width: 920px; }}
     .help-page .surface {{ padding: 22px; }}
     .help-page h1 {{ margin-bottom: 12px; }}
@@ -203,7 +210,30 @@ def _page(title: str, body: str) -> bytes:
     .help-page p, .help-page li {{ color: #dacabb; line-height: 1.62; }}
     .help-page ul {{ margin: 0; padding-left: 20px; }}
     .help-page code {{ color: #ffd0ad; background: rgba(245, 239, 231, 0.08); border-radius: 5px; padding: 2px 5px; }}
-    @media (max-width: 860px) {{ .pending-fields, .capture-grid {{ grid-template-columns: 1fr; }} .pending-fields label:nth-child(2), .pending-content-field {{ grid-column: auto; }} header.top {{ align-items: flex-start; flex-direction: column; }} }}
+    @media (max-width: 900px) {{
+      main {{ width: min(100% - 32px, 760px); margin-top: 28px; }}
+      header.top {{ align-items: flex-start; flex-direction: column; gap: 20px; }}
+      .actions {{ justify-content: flex-start; }}
+      .pending-fields, .capture-grid {{ grid-template-columns: 1fr; }}
+      .pending-fields label:nth-child(2), .pending-content-field {{ grid-column: auto; }}
+      .provider-panel > summary {{ min-height: 58px; }}
+    }}
+    @media (max-width: 560px) {{
+      main {{ width: min(100% - 22px, 520px); margin: 22px auto 48px; }}
+      h1 {{ font-size: clamp(36px, 12vw, 48px); }}
+      .actions {{ display: grid; width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); }}
+      .actions form, .actions a.button, .actions button {{ width: 100%; }}
+      .actions a.button, .actions button {{ text-align: center; }}
+      .capture-grid {{ gap: 10px; }}
+      .drop-zone {{ min-height: 150px; padding: 22px 16px; }}
+      .provider-panel > summary {{ padding-inline: 14px; }}
+      .provider-summary-meta {{ max-width: 48%; }}
+      .card {{ padding: 16px; }}
+      .section-head {{ align-items: flex-start; flex-direction: column; gap: 2px; }}
+      .saved-card-actions {{ grid-template-columns: 1fr 1fr; }}
+      .saved-edit > summary, .saved-delete > summary {{ text-align: center; }}
+      .saved-edit[open], .saved-delete[open] {{ min-width: 0; }}
+    }}
   </style>
   <script>
     function showAsyncStatus(message, isError = false) {{

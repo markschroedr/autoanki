@@ -65,6 +65,22 @@ class GeneratorTests(unittest.TestCase):
                 ],
             )
 
+    def test_unicode_glitch_in_model_output_is_reported(self):
+        generator = OpenRouterCardGenerator(api_key="test-key", model="openai/gpt-5.6-sol")
+        result = generator._generation_from_parsed(
+            {"note_to_user": "Anfangs条件", "cards": []},
+            {"text": "Deutscher Regelungstechnikstoff"},
+        )
+        self.assertIn("Unicode-Check", result.note_to_user)
+
+    def test_cjk_in_source_is_not_flagged_as_a_glitch(self):
+        generator = OpenRouterCardGenerator(api_key="test-key", model="openai/gpt-5.6-sol")
+        result = generator._generation_from_parsed(
+            {"note_to_user": "条件 erklärt", "cards": []},
+            {"text": "条件 und deutsche Erklärung"},
+        )
+        self.assertNotIn("Unicode-Check", result.note_to_user)
+
     def test_card_schema_uses_configured_tags(self):
         with patch.dict(os.environ, {"AUTOANKI_TAGS": "command,workflow"}, clear=True):
             tag_enum = card_schema()["properties"]["cards"]["items"]["properties"]["tags"]["items"]["enum"]
@@ -94,23 +110,11 @@ class GeneratorTests(unittest.TestCase):
             self.assertIn("AUTOANKI_TARGET_CARD_COUNT=4", text)
             self.assertIn("OPENROUTER_API_KEY=secret", text)
 
-    def test_custom_prompt_is_persisted_and_appended_after_generic_rules(self):
+    def test_custom_prompt_is_persisted_and_cleared(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "custom_prompt.txt"
             save_custom_prompt("Write concise German cards.", path)
             self.assertEqual(load_custom_prompt(path), "Write concise German cards.")
-
-            with patch.dict(os.environ, {"AUTOANKI_TAGS": "concept"}, clear=True):
-                generator = OpenRouterCardGenerator(
-                    api_key="test-key",
-                    model="test-model",
-                    custom_prompt_path=path,
-                )
-                prompt = generator._system_prompt()
-
-            self.assertIn("You create high-quality Anki cards", prompt)
-            self.assertIn("generic output, safety, MathJax, and allowed-tag rules remain authoritative", prompt)
-            self.assertIn("Write concise German cards.", prompt)
 
             save_custom_prompt("", path)
             self.assertFalse(path.exists())

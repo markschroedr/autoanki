@@ -15,6 +15,21 @@ class ValidateTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertIn("cloze cards need at least one {{c1::...}} deletion", result.errors)
 
+    def test_cloze_wrapper_outside_mathjax_is_allowed(self):
+        result = validate_card(
+            {"type": "cloze", "front": r"{{c1::\(x^2\)}}", "back": "", "tags": ["formula"]},
+            check_math=False,
+        )
+        self.assertTrue(result.ok)
+
+    def test_cloze_inside_mathjax_is_rejected(self):
+        result = validate_card(
+            {"type": "cloze", "front": r"\({{c1::x^2}}\)", "back": "", "tags": ["formula"]},
+            check_math=False,
+        )
+        self.assertFalse(result.ok)
+        self.assertTrue(any("cloze wrapper must surround MathJax delimiters" in error for error in result.errors))
+
     @patch("autoanki.validate.shutil.which", return_value="katex")
     @patch("autoanki.validate.subprocess.run")
     def test_katex_error_marks_card_invalid(self, run, _which):

@@ -39,6 +39,12 @@ DEFAULT_TAGS = [
     "workflow",
 ]
 JSON_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
+CJK_CHARACTERS = r"\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\u3040-\u30ff\uac00-\ud7af"
+UNEXPECTED_CJK = re.compile(fr"[{CJK_CHARACTERS}]")
+UNICODE_GLITCH_WARNING = (
+    "Unicode-Check: Unerwartete CJK-Zeichen in der Modellantwort erkannt; "
+    "bitte die Ausgabe vor dem Speichern prüfen."
+)
 MAX_CUSTOM_PROMPT_LENGTH = 20_000
 
 
@@ -470,7 +476,7 @@ class CardGenerator:
             raise RuntimeError(f"{self.config.name} request failed ({exc.code}): {body}") from exc
 
         content = response_data["choices"][0]["message"]["content"]
-        return self._generation_from_parsed(_parse_json_content(content))
+        return self._generation_from_parsed(_parse_json_content(content), source)
 
     def _generate_anthropic(self, source: dict[str, Any], forced_tags: list[str] | None) -> GenerationResult:
         payload = self._anthropic_payload(source, forced_tags)
@@ -495,7 +501,7 @@ class CardGenerator:
             for part in response_data.get("content", [])
             if isinstance(part, dict) and part.get("type") == "text"
         )
-        return self._generation_from_parsed(_parse_json_content(text))
+        return self._generation_from_parsed(_parse_json_content(text), source)
 
     def _generate_gemini(self, source: dict[str, Any], forced_tags: list[str] | None) -> GenerationResult:
         payload = self._gemini_payload(source, forced_tags)
@@ -518,12 +524,18 @@ class CardGenerator:
         candidates = response_data.get("candidates") or []
         parts = (((candidates[0] or {}).get("content") or {}).get("parts") or []) if candidates else []
         text = "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
-        return self._generation_from_parsed(_parse_json_content(text))
+        return self._generation_from_parsed(_parse_json_content(text), source)
 
-    def _generation_from_parsed(self, parsed: dict[str, Any]) -> GenerationResult:
+    def _generation_from_parsed(self, parsed: dict[str, Any], source: dict[str, Any] | None = None) -> GenerationResult:
+        cards = clean_cards(parsed.get("cards", []))
+        note_to_user = str(parsed.get("note_to_user") or "").strip()
+        source_text = str((source or {}).get("text") or "")
+        model_output = json.dumps({"note_to_user": note_to_user, "cards": cards}, ensure_ascii=False)
+        if UNEXPECTED_CJK.search(model_output) and not UNEXPECTED_CJK.search(source_text):
+            note_to_user = f"{note_to_user}\n\n{UNICODE_GLITCH_WARNING}".strip()
         return GenerationResult(
-            cards=clean_cards(parsed.get("cards", [])),
-            note_to_user=str(parsed.get("note_to_user") or "").strip(),
+            cards=cards,
+            note_to_user=note_to_user,
         )
 
     def _base_text_parts(self, source: dict[str, Any], forced_tags: list[str] | None) -> list[str]:

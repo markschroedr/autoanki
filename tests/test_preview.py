@@ -24,8 +24,7 @@ class PreviewTests(unittest.TestCase):
         self.assertIn("data:image/png;base64,abc123", html)
         self.assertIn(r"What is \(G(s)\)?", html)
 
-    @patch("autoanki.preview._render_katex", return_value='<span class="katex">G(s)</span>')
-    def test_preview_pre_renders_math(self, _render_katex):
+    def test_preview_leaves_math_for_browser_typesetting(self):
         html = render_preview_html(
             [
                 {
@@ -38,8 +37,8 @@ class PreviewTests(unittest.TestCase):
                 }
             ]
         )
-        self.assertIn('<span class="katex">G(s)</span>', html)
-        self.assertNotIn(r"\(G(s)\)", html)
+        self.assertIn(r"\(G(s)\)", html)
+        self.assertNotIn('<span class="katex">G(s)</span>', html)
 
     def test_preview_renders_cloze_without_raw_markup(self):
         html = render_preview_html(

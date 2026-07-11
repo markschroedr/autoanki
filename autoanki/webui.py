@@ -37,6 +37,12 @@ from .validate import configured_tags, validate_cards
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 RECENT_PAGE_SIZE = 10
+FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+<rect width="32" height="32" rx="8" fill="#211914"/>
+<path d="M8.5 23.5 14.9 8.8h2.9l6.4 14.7h-3.8l-1.2-3.1h-5.8l-1.2 3.1H8.5Zm6.2-6h3.2l-1.6-4.2-1.6 4.2Z" fill="#d99b72"/>
+<path d="M22.2 8.7h2.7" stroke="#f5efe7" stroke-width="2" stroke-linecap="round"/>
+</svg>"""
+FAVICON_DATA_URI = "data:image/svg+xml," + urllib.parse.quote(FAVICON_SVG, safe="")
 
 
 def _default_runtime_path(path: str | Path) -> Path:
@@ -69,7 +75,7 @@ def _page(title: str, body: str) -> bytes:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)}</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
+  <link rel="icon" type="image/svg+xml" href="{FAVICON_DATA_URI}">
   <script>
     window.MathJax = {{ tex: {{ inlineMath: [['\\\\(', '\\\\)']], displayMath: [['\\\\[', '\\\\]']] }} }};
   </script>
@@ -275,6 +281,9 @@ def _page(title: str, body: str) -> bytes:
       document.body.replaceWith(documentFromResponse.body);
       window.scrollTo(0, scrollTop);
       installInteractions();
+      if (window.MathJax && typeof window.MathJax.typesetPromise === 'function') {{
+        await window.MathJax.typesetPromise([document.body]);
+      }}
     }}
     async function refreshPage() {{
       const response = await fetch(window.location.href, {{ headers: {{ 'X-Requested-With': 'fetch' }} }});
@@ -305,7 +314,9 @@ def _page(title: str, body: str) -> bytes:
         form.addEventListener('submit', event => {{
           event.preventDefault();
           const submitter = event.submitter;
-          const action = (submitter && submitter.formAction) || form.action;
+          const buttonAction = submitter && submitter.getAttribute('formaction');
+          const formAction = form.getAttribute('action');
+          const action = buttonAction || formAction || window.location.pathname;
           const formData = new FormData(form);
           if (submitter && submitter.name && !formData.has(submitter.name)) {{
             formData.append(submitter.name, submitter.value);

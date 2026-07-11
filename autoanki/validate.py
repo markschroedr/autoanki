@@ -41,6 +41,16 @@ def extract_math_snippets(text: str) -> list[str]:
     return INLINE_MATH.findall(text or "") + BLOCK_MATH.findall(text or "")
 
 
+def has_cloze_inside_math(text: str) -> bool:
+    r"""Return whether a cloze deletion is nested inside MathJax delimiters.
+
+    Anki accepts the opposite nesting, where the cloze wrapper surrounds the
+    MathJax expression (for example ``{{c1::\(x\)}}``).  Only the invalid
+    ``\({{c1::x}}\)`` form is rejected here.
+    """
+    return any(CLOZE.search(snippet) for snippet in extract_math_snippets(text))
+
+
 def _validate_katex(snippet: str) -> tuple[bool | None, str | None]:
     executable = shutil.which("katex.cmd") if os.name == "nt" else None
     executable = executable or shutil.which("katex")
@@ -95,6 +105,9 @@ def validate_card(
 
     if "$" in front or "$" in back:
         errors.append("use \\(...\\) or \\[...\\] for MathJax, never $...$")
+
+    if has_cloze_inside_math(front + "\n" + back):
+        errors.append("cloze wrapper must surround MathJax delimiters, not appear inside them")
 
     if check_math:
         for snippet in extract_math_snippets(front + "\n" + back):

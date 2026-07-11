@@ -61,19 +61,13 @@ def _render_plain(value: str) -> str:
 
 
 def _render_text(value: str) -> str:
+    """Escape card text while leaving MathJax delimiters for browser typesetting."""
     value = clean_text(value)
     rendered = []
     last = 0
     for match in MATH_PATTERN.finditer(value or ""):
         rendered.append(_render_plain(value[last : match.start()]))
-        inline_snippet = match.group(1)
-        block_snippet = match.group(2)
-        snippet = inline_snippet if inline_snippet is not None else block_snippet
-        katex_html = _render_katex(snippet, display=block_snippet is not None)
-        if katex_html:
-            rendered.append(katex_html)
-        else:
-            rendered.append(html.escape(match.group(0)))
+        rendered.append(html.escape(match.group(0)))
         last = match.end()
     rendered.append(_render_plain((value or "")[last:]))
     return "".join(rendered).replace("\n", "<br>")
@@ -134,7 +128,6 @@ def render_preview_html(cards: list[dict[str, Any]]) -> str:
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>anki-quickcap preview</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.17.0/dist/katex.min.css">
   <script>
     window.MathJax = {{ tex: {{ inlineMath: [['\\\\(', '\\\\)']], displayMath: [['\\\\[', '\\\\]']] }} }};
   </script>

@@ -14,7 +14,7 @@ from .build_deck import ExportMode, NoUnexportedCards, build_deck
 from .generator import GenerationResult, OpenRouterCardGenerator, image_to_b64
 from .paths import CARDS_PATH, DECK_PATH
 from .preview import review_cards
-from .storage import append_cards
+from .storage import append_cards, get_stack, load_store
 from .text_clean import clean_cards, clean_source
 from .validate import configured_tags, validate_cards
 
@@ -254,12 +254,19 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--cards", default=CARDS_PATH, help="path to cards.json")
     parser.add_argument("--output", default=DECK_PATH, help="deck output path")
     parser.add_argument("--export-mode", choices=["new", "all"], default="new", help="export only new cards or all cards")
+    parser.add_argument("--stack", help="stack name or stable ID (defaults to the active stack)")
+    parser.add_argument("--all-stacks", action="store_true", help="export every stack as separate Anki decks")
     parser.add_argument("--browser", action="store_true", help="open the HTML preview from the CLI")
     args = parser.parse_args(argv)
 
     if args.rebuild:
         try:
-            print(build_deck(args.cards, args.output, export_mode=args.export_mode))
+            stack_id = None
+            if args.stack:
+                store = load_store(args.cards)
+                try: stack_id = get_stack(store, args.stack)["id"]
+                except ValueError: stack_id = get_stack(store, stack_name=args.stack)["id"]
+            print(build_deck(args.cards, args.output, export_mode=args.export_mode, stack_id=stack_id, scope="all" if args.all_stacks else "selected"))
         except NoUnexportedCards as exc:
             print(str(exc))
         return 0

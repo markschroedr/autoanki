@@ -332,6 +332,16 @@ class WebUiE2ETests(unittest.TestCase):
             self.assertIn("API keys stay in your local", html)
             self.assertIn("Back to AutoAnki", html)
 
+    def test_server_refuses_a_second_listener_on_the_same_port(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            first = make_server("127.0.0.1", 0, WebState(cards_path=tmp_path / "one.json"))
+            try:
+                with self.assertRaises(OSError):
+                    make_server("127.0.0.1", first.server_port, WebState(cards_path=tmp_path / "two.json"))
+            finally:
+                first.server_close()
+
     def test_provider_settings_form_is_rendered_and_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

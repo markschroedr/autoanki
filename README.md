@@ -49,7 +49,7 @@ uv run autoanki-web
 3. Edit or discard weak ones, accept the rest
 4. Export and import the `.apkg` into Anki
 
-Saved cards stay editable in the UI and live in a single inspectable `data/cards.json`. `uv run autoanki --rebuild` regenerates the deck from saved cards; `--export-mode all` rebuilds everything.
+Saved and pending cards stay editable in the UI and live in a single inspectable, versioned `data/cards.json`. Organize them into stacks, switch the active stack before capturing, and export either that stack or all stacks as separate Anki decks. `uv run autoanki --rebuild` exports the active stack; use `--stack NAME`, `--all-stacks`, and `--export-mode all` to control CLI exports.
 
 There's also a CLI (`uv run autoanki`) and Windows `.cmd` launchers.
 

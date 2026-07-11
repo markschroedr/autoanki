@@ -17,7 +17,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
 
-from .build_deck import NoUnexportedCards, apkg_output_path, build_deck
+from .build_deck import NoUnexportedCards, apkg_output_path, build_deck, stack_output_path
 from .generator import (
     OpenRouterCardGenerator,
     configured_target_card_count,
@@ -30,13 +30,20 @@ from .generator import (
 from .paths import CARDS_PATH, CUSTOM_PROMPT_PATH, DECK_PATH
 from .preview import _render_text, render_cards_html
 from .quickcap import capture_clipboard, generate_with_note, hydrate_cards
-from .storage import append_cards, load_cards, save_cards
+from .storage import (append_cards, create_stack, delete_stack, get_stack, load_cards,
+                      load_store, rename_stack, save_cards, save_store, select_stack)
 from .validate import configured_tags, validate_cards
 
 
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8765
 RECENT_PAGE_SIZE = 10
+
+
+class ExclusiveThreadingHTTPServer(ThreadingHTTPServer):
+    """Refuse duplicate listeners instead of load-balancing broken app instances."""
+
+    allow_reuse_address = False
 FAVICON_SVG = """<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 <rect width="32" height="32" rx="8" fill="#211914"/>
 <path d="M8.5 23.5 14.9 8.8h2.9l6.4 14.7h-3.8l-1.2-3.1h-5.8l-1.2 3.1H8.5Zm6.2-6h3.2l-1.6-4.2-1.6 4.2Z" fill="#d99b72"/>
@@ -61,11 +68,37 @@ class WebState:
     custom_prompt_path: Path = CUSTOM_PROMPT_PATH
     generator_factory: Callable[[], Any] = OpenRouterCardGenerator
     capture_fn: Callable[[], dict[str, Any]] = capture_clipboard
-    pending: list[dict[str, Any]] = field(default_factory=list)
     llm_note: str = ""
     message: str = ""
     error: str = ""
     last_export: Path | None = None
+
+    @property
+    def store(self) -> dict[str, Any]:
+        return load_store(self.cards_path)
+
+    @property
+    def active_stack(self) -> dict[str, Any]:
+        return get_stack(self.store)
+
+    @property
+    def pending(self) -> list[dict[str, Any]]:
+        return self.active_stack["pending"]
+
+    @pending.setter
+    def pending(self, cards: list[dict[str, Any]]) -> None:
+        store = self.store; get_stack(store)["pending"] = cards; save_store(store, self.cards_path)
+
+
+def _persist_pending(state: WebState, cards: list[dict[str, Any]], stack_id: str | None = None) -> None:
+    store = state.store; stack = get_stack(store, stack_id); stack["pending"] = cards; save_store(store, state.cards_path)
+
+
+def _require_stack(state: WebState, form: dict[str, str]) -> dict[str, Any]:
+    stack = state.active_stack
+    if form.get("stack_id") and form["stack_id"] != stack["id"]:
+        raise ValueError("The active stack changed. Reload the page and try again.")
+    return stack
 
 
 def _page(title: str, body: str) -> bytes:
@@ -148,6 +181,29 @@ def _page(title: str, body: str) -> bytes:
       box-shadow: 0 18px 48px rgba(0, 0, 0, 0.11);
       backdrop-filter: blur(8px);
     }}
+    .stack-bar {{ padding: 16px 18px; margin: 0 0 16px; }}
+    .stack-main {{ display: grid; grid-template-columns: minmax(180px, 1fr) auto; gap: 12px; align-items: end; }}
+    .stack-picker {{ display: grid; gap: 6px; }}
+    .stack-picker label {{ color: var(--ochre); font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }}
+    .stack-picker select {{ min-height: 42px; background: rgba(12, 12, 12, 0.72); font-weight: 600; }}
+    .stack-meta {{ display: flex; gap: 7px; padding-bottom: 9px; white-space: nowrap; }}
+    .stack-count {{ border: 1px solid var(--line); border-radius: 999px; padding: 4px 8px; color: var(--muted); font-size: 12px; }}
+    .stack-manage {{ margin-top: 10px; border-top: 1px solid var(--line); }}
+    .stack-manage > summary {{ width: fit-content; padding: 11px 0 1px; color: var(--text-soft); cursor: pointer; list-style: none; font-size: 13px; }}
+    .stack-manage > summary::before {{ content: "›"; display: inline-block; margin-right: 7px; color: var(--ochre); font-size: 18px; vertical-align: -1px; transition: transform 140ms ease; }}
+    .stack-manage[open] > summary::before {{ transform: rotate(90deg); }}
+    .stack-manage > summary::-webkit-details-marker {{ display: none; }}
+    .stack-management-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding-top: 14px; }}
+    .stack-tool {{ display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: end; padding: 13px; border: 1px solid var(--line); border-radius: 8px; background: rgba(10, 10, 10, 0.22); }}
+    .stack-tool label {{ display: grid; gap: 5px; min-width: 0; color: var(--muted); font-size: 12px; }}
+    .stack-tool input {{ min-height: 39px; }}
+    .stack-danger {{ grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; padding: 13px; border: 1px solid rgba(240, 128, 111, 0.22); border-radius: 8px; background: rgba(107, 48, 43, 0.12); }}
+    .stack-danger-copy {{ display: grid; gap: 5px; }}
+    .stack-danger-copy strong {{ color: #ffd8d0; font-size: 13px; }}
+    .stack-danger-copy span {{ color: var(--muted); font-size: 12px; line-height: 1.4; }}
+    .stack-danger-controls {{ display: flex; gap: 8px; align-items: end; }}
+    .stack-danger-controls label {{ display: grid; gap: 5px; color: #d8aaa2; font-size: 12px; }}
+    .stack-danger-controls input {{ width: 190px; min-height: 39px; }}
     .capture-grid {{ display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.75fr); gap: 14px; align-items: stretch; margin: 12px 0 10px; }}
     .drop-zone {{ min-height: 172px; padding: 28px; display: grid; place-items: center; text-align: center; position: relative; overflow: hidden; }}
     .drop-zone.dragging {{ border-color: #c58361; background: rgba(173, 105, 72, 0.08); }}
@@ -227,6 +283,8 @@ def _page(title: str, body: str) -> bytes:
       header.top {{ align-items: flex-start; flex-direction: column; gap: 20px; }}
       .actions {{ justify-content: flex-start; }}
       .pending-fields, .capture-grid {{ grid-template-columns: 1fr; }}
+      .stack-management-grid {{ grid-template-columns: 1fr; }}
+      .stack-danger {{ grid-column: auto; grid-template-columns: 1fr; }}
       .pending-fields label:nth-child(2), .pending-content-field {{ grid-column: auto; }}
       .provider-panel > summary {{ min-height: 58px; }}
     }}
@@ -245,6 +303,10 @@ def _page(title: str, body: str) -> bytes:
       .saved-card-actions {{ grid-template-columns: 1fr 1fr; }}
       .saved-edit > summary, .saved-delete > summary {{ text-align: center; }}
       .saved-edit[open], .saved-delete[open] {{ min-width: 0; }}
+      .stack-bar .actions, .stack-tool, .stack-danger-controls {{ display: grid; grid-template-columns: 1fr; }}
+      .stack-main {{ grid-template-columns: 1fr; }}
+      .stack-meta {{ padding: 0; }}
+      .stack-danger-controls input {{ width: 100%; }}
     }}
   </style>
   <script>
@@ -423,7 +485,7 @@ def _recent_cards(cards: list[dict[str, Any]], offset: int, limit: int = RECENT_
     return page, has_newer, has_older
 
 
-def _saved_card_actions_html(card: dict[str, Any], offset: int) -> str:
+def _saved_card_actions_html(card: dict[str, Any], offset: int, stack_id: str = "") -> str:
     card_id = str(card.get("id") or "")
     if not card_id:
         return '<div class="warnings">This legacy card has no ID and cannot be edited safely.</div>'
@@ -437,6 +499,7 @@ def _saved_card_actions_html(card: dict[str, Any], offset: int) -> str:
       <details class="saved-edit">
         <summary>Edit</summary>
         <form class="saved-edit-form" method="post" action="/saved/update">
+          <input type="hidden" name="stack_id" value="{html.escape(stack_id)}">
           <input type="hidden" name="card_id" value="{html.escape(card_id)}">
           <input type="hidden" name="offset" value="{offset}">
           <div class="pending-fields">
@@ -468,6 +531,7 @@ def _saved_card_actions_html(card: dict[str, Any], offset: int) -> str:
           <span>Delete this local saved card permanently? Existing Anki imports are not changed.</span>
           <button class="small" type="button" onclick="this.closest('details').removeAttribute('open')">Cancel</button>
           <form method="post" action="/saved/delete">
+            <input type="hidden" name="stack_id" value="{html.escape(stack_id)}">
             <input type="hidden" name="card_id" value="{html.escape(card_id)}">
             <input type="hidden" name="offset" value="{offset}">
             <button class="small danger" type="submit">Yes, delete</button>
@@ -478,7 +542,7 @@ def _saved_card_actions_html(card: dict[str, Any], offset: int) -> str:
     """
 
 
-def _recent_cards_html(saved_cards: list[dict[str, Any]], offset: int) -> str:
+def _recent_cards_html(saved_cards: list[dict[str, Any]], offset: int, stack_id: str = "") -> str:
     page_cards, has_newer, has_older = _recent_cards(saved_cards, offset)
     if not saved_cards:
         return '<section><h2>Saved cards</h2><div class="empty">No saved cards yet.</div></section>'
@@ -500,7 +564,7 @@ def _recent_cards_html(saved_cards: list[dict[str, Any]], offset: int) -> str:
         <h2>Saved cards</h2>
         <span>{start}-{end} of {len(saved_cards)} / newest first</span>
       </div>
-      {render_cards_html(page_cards, start_index=start, card_footer=lambda card: _saved_card_actions_html(card, offset))}
+      {render_cards_html(page_cards, start_index=start, card_footer=lambda card: _saved_card_actions_html(card, offset, stack_id))}
       {nav_html}
     </section>
     """
@@ -515,12 +579,14 @@ def _log_pending_generation(
     source: dict[str, Any],
     cards: list[dict[str, Any]],
     llm_note: str,
+    stack: dict[str, Any] | None = None,
 ) -> None:
     if not cards:
         return
     log_path = _pending_log_path(cards_path)
     log_path.parent.mkdir(parents=True, exist_ok=True)
     record = {"source": source, "cards": cards, "llm_note": llm_note}
+    if stack: record.update({"stack_id": stack["id"], "stack_name": stack["name"]})
     with log_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, ensure_ascii=False) + "\n")
 
@@ -612,7 +678,7 @@ def _custom_prompt_panel_html(path: str | Path = CUSTOM_PROMPT_PATH) -> str:
     """
 
 
-def _pending_card_editor(card: dict[str, Any], index: int) -> str:
+def _pending_card_editor(card: dict[str, Any], index: int, stack_id: str = "") -> str:
     tags = ",".join(card.get("tags") or [])
     type_options = []
     for card_type in ("basic", "cloze"):
@@ -646,6 +712,8 @@ def _pending_card_editor(card: dict[str, Any], index: int) -> str:
 
     return f"""
     <form class="card pending-card {status}" method="post" action="/update">
+      <input type="hidden" name="stack_id" value="{html.escape(stack_id)}">
+      <input type="hidden" name="card_id" value="{html.escape(str(card.get('id', '')))}">
       <header>
         <strong>{index + 1}. Pending card</strong>
         <span>{html.escape(tags)}</span>
@@ -744,25 +812,26 @@ def render_help() -> bytes:
 
 
 def render_home(state: WebState, offset: int = 0) -> bytes:
-    pending_count = len(state.pending)
-    saved_cards = load_cards(state.cards_path)
+    store = state.store; active = get_stack(store); stack_id = active["id"]
+    pending_count = len(active["pending"])
+    saved_cards = active["cards"]
     saved_count = len(saved_cards)
     message = f'<div class="notice">{html.escape(state.message)}</div>' if state.message else ""
     error = f'<div class="error">{html.escape(state.error)}</div>' if state.error else ""
     llm_note = f'<div class="llm-note"><strong>LLM note:</strong> {html.escape(state.llm_note)}</div>' if state.llm_note else ""
     export_link = ""
-    existing_export = state.last_export or apkg_output_path(state.output_path)
-    if existing_export.exists():
+    existing_export = state.last_export
+    if existing_export and existing_export.exists():
         state.last_export = existing_export
         export_link = f'<a class="button" href="/deck">Download .apkg</a>'
 
-    if state.pending:
-        pending_cards = "".join(_pending_card_editor(card, index) for index, card in enumerate(state.pending))
+    if active["pending"]:
+        pending_cards = "".join(_pending_card_editor(card, index, stack_id) for index, card in enumerate(active["pending"]))
         pending_html = f"""
         <section>
           <div class="section-head">
             <h2>Pending cards</h2>
-            <form method="post" action="/accept"><button type="submit">Accept all</button></form>
+            <form method="post" action="/accept"><input type="hidden" name="stack_id" value="{stack_id}"><button type="submit">Accept all</button></form>
           </div>
           {pending_cards}
         </section>
@@ -770,7 +839,42 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
     else:
         pending_html = '<section><h2>Pending cards</h2><div class="empty">No pending cards. Copy text or an image, then capture.</div></section>'
 
-    saved_html = _recent_cards_html(saved_cards, offset)
+    saved_html = _recent_cards_html(saved_cards, offset, stack_id)
+    options = "".join(f'<option value="{s["id"]}"{" selected" if s["id"] == stack_id else ""}>{html.escape(s["name"])}</option>' for s in store["stacks"])
+    stack_panel = f"""
+    <section class="surface stack-bar">
+      <div class="stack-main">
+        <form method="post" action="/stacks/select" class="stack-picker">
+          <label for="active-stack">Card stack</label>
+          <select id="active-stack" name="stack_id" onchange="this.form.requestSubmit()">{options}</select>
+        </form>
+        <div class="stack-meta" aria-label="Stack totals">
+          <span class="stack-count">{saved_count} saved</span>
+          <span class="stack-count">{pending_count} pending</span>
+        </div>
+      </div>
+      <details class="stack-manage"><summary>Manage stacks</summary>
+        <div class="stack-management-grid">
+          <form method="post" action="/stacks/create" class="stack-tool">
+            <label>New stack<input name="name" maxlength="80" placeholder="e.g. Control theory" required></label>
+            <button type="submit">Create</button>
+          </form>
+          <form method="post" action="/stacks/rename" class="stack-tool">
+            <input type="hidden" name="stack_id" value="{stack_id}">
+            <label>Rename current stack<input name="name" maxlength="80" value="{html.escape(active['name'])}" required></label>
+            <button type="submit">Rename</button>
+          </form>
+          <div class="stack-danger">
+            <div class="stack-danger-copy"><strong>Delete “{html.escape(active['name'])}”</strong><span>Permanently removes its local drafts and cards. Existing Anki imports are not affected.</span></div>
+            <form method="post" action="/stacks/delete" class="stack-danger-controls">
+              <input type="hidden" name="stack_id" value="{stack_id}">
+              <label>Type the stack name<input name="confirmation" placeholder="{html.escape(active['name'])}" required></label>
+              <button class="danger" type="submit">Delete</button>
+            </form>
+          </div>
+        </div>
+      </details>
+    </section>"""
 
     body = f"""
     <header class="top">
@@ -778,15 +882,18 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
         <h1>AutoAnki Quickcap</h1>
       </div>
       <div class="actions">
-        <form method="post" action="/capture"><button class="primary" type="submit">Capture Clipboard</button></form>
+        <form method="post" action="/capture"><input type="hidden" name="stack_id" value="{stack_id}"><button class="primary" type="submit">Capture Clipboard</button></form>
         <form method="post" action="/export">
           <input type="hidden" name="mode" value="new">
+          <input type="hidden" name="scope" value="selected"><input type="hidden" name="stack_id" value="{stack_id}">
           <button type="submit">Export new</button>
         </form>
         <form method="post" action="/export">
           <input type="hidden" name="mode" value="all">
+          <input type="hidden" name="scope" value="selected"><input type="hidden" name="stack_id" value="{stack_id}">
           <button type="submit">Rebuild all</button>
         </form>
+        <form method="post" action="/export"><input type="hidden" name="mode" value="all"><input type="hidden" name="scope" value="all"><button type="submit">Export all stacks</button></form>
         <a class="button" href="/help">How does this work?</a>
         {export_link}
         <form method="post" action="/stop"><button class="danger" type="submit">Stop</button></form>
@@ -795,6 +902,7 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
     {message}
     {error}
     {llm_note}
+    {stack_panel}
     {_capture_html(state.custom_prompt_path)}
     {pending_html}
     {saved_html}
@@ -875,12 +983,12 @@ class QuickcapHandler(BaseHTTPRequestHandler):
         generation = generate_with_note(generator, source, forced_tags=None)
         self.state.llm_note = generation.note_to_user
         new_pending = hydrate_cards(generation.cards, source)
-        previous_count = len(self.state.pending)
-        self.state.pending.extend(new_pending)
-        validate_cards(self.state.pending)
-        _log_pending_generation(self.state.cards_path, source, new_pending, self.state.llm_note)
+        stack = self.state.active_stack; pending = stack["pending"]
+        previous_count = len(pending); pending.extend(new_pending); validate_cards(pending)
+        _persist_pending(self.state, pending, stack["id"])
+        _log_pending_generation(self.state.cards_path, source, new_pending, self.state.llm_note, stack)
         self.state.message = (
-            f"Added {len(new_pending)} pending card(s). Total pending: {len(self.state.pending)}."
+            f"Added {len(new_pending)} pending card(s). Total pending: {len(pending)}."
             if previous_count
             else f"Generated {len(new_pending)} pending card(s)."
         )
@@ -890,7 +998,8 @@ class QuickcapHandler(BaseHTTPRequestHandler):
         unknown = [tag for tag in tags if tag not in configured_tags()]
         if unknown:
             raise ValueError(f"Unknown tags: {', '.join(unknown)}")
-        self.state.pending[index].update(
+        pending = self.state.pending
+        pending[index].update(
             {
                 "type": form.get("type", "basic"),
                 "front": form.get("front", ""),
@@ -898,6 +1007,7 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                 "tags": tags[:2],
             }
         )
+        _persist_pending(self.state, pending, self.state.active_stack["id"])
 
     def _saved_card_index(self, cards: list[dict[str, Any]], card_id: str) -> int:
         for index, card in enumerate(cards):
@@ -952,6 +1062,18 @@ class QuickcapHandler(BaseHTTPRequestHandler):
         self.state.error = ""
         self.state.message = ""
         try:
+            if self.path == "/stacks/select":
+                form = self._form(); stack = select_stack(form.get("stack_id", ""), self.state.cards_path)
+                self.state.last_export = None; self.state.message = f"Switched to {stack['name']}."; self._redirect(); return
+            if self.path == "/stacks/create":
+                form = self._form(); stack = create_stack(form.get("name", ""), self.state.cards_path)
+                self.state.last_export = None; self.state.message = f"Created {stack['name']}."; self._redirect(); return
+            if self.path == "/stacks/rename":
+                form = self._form(); _require_stack(self.state, form); stack = rename_stack(form["stack_id"], form.get("name", ""), self.state.cards_path)
+                self.state.message = f"Renamed stack to {stack['name']}."; self._redirect(); return
+            if self.path == "/stacks/delete":
+                form = self._form(); _require_stack(self.state, form); stack = delete_stack(form["stack_id"], form.get("confirmation", ""), self.state.cards_path)
+                self.state.last_export = None; self.state.message = f"Deleted {stack['name']}."; self._redirect(); return
             if self.path == "/capture":
                 source = self.state.capture_fn()
                 self._generate_pending(source)
@@ -963,10 +1085,10 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                 self._redirect()
                 return
             if self.path == "/accept":
-                if self.state.pending:
-                    total = append_cards(self.state.pending, self.state.cards_path)
-                    count = len(self.state.pending)
-                    self.state.pending = []
+                form = self._form(); stack = _require_stack(self.state, form); pending = stack["pending"]
+                if pending:
+                    total = append_cards(pending, self.state.cards_path, stack["id"])
+                    count = len(pending); _persist_pending(self.state, [], stack["id"])
                     self.state.llm_note = ""
                     self.state.message = f"Saved {count} card(s). Total: {len(total)}."
                 else:
@@ -997,18 +1119,19 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                 return
             if self.path == "/accept-one":
                 form = self._form()
+                stack = _require_stack(self.state, form); pending = stack["pending"]
                 index = int(form.get("index", "-1"))
-                if 0 <= index < len(self.state.pending):
+                if 0 <= index < len(pending) and (not form.get("card_id") or pending[index].get("id") == form.get("card_id")):
                     self._update_pending_card(index, form)
-                    card = self.state.pending.pop(index)
+                    pending = self.state.pending; card = pending.pop(index)
                     validate_cards([card])
-                    total = append_cards([card], self.state.cards_path)
+                    _persist_pending(self.state, pending, stack["id"]); total = append_cards([card], self.state.cards_path, stack["id"])
                     self.state.message = f"Saved 1 card. Total: {len(total)}."
                 self._redirect()
                 return
             if self.path == "/saved/update":
                 form = self._form()
-                cards = load_cards(self.state.cards_path)
+                stack = _require_stack(self.state, form); cards = load_cards(self.state.cards_path, stack["id"])
                 index = self._saved_card_index(cards, form.get("card_id", ""))
                 tags = [tag.strip() for tag in form.get("tags", "").split(",") if tag.strip()]
                 updated = {
@@ -1024,55 +1147,60 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                 if not result.ok:
                     raise ValueError("Could not save card: " + "; ".join(result.errors))
                 cards[index] = updated
-                save_cards(cards, self.state.cards_path)
+                save_cards(cards, self.state.cards_path, stack["id"])
                 self.state.message = "Updated saved card. It will be included in the next new-card export."
                 self._saved_card_redirect(form.get("offset", "0"), len(cards))
                 return
             if self.path == "/saved/delete":
                 form = self._form()
-                cards = load_cards(self.state.cards_path)
+                stack = _require_stack(self.state, form); cards = load_cards(self.state.cards_path, stack["id"])
                 index = self._saved_card_index(cards, form.get("card_id", ""))
                 cards.pop(index)
-                save_cards(cards, self.state.cards_path)
+                save_cards(cards, self.state.cards_path, stack["id"])
                 self.state.message = f"Deleted saved card. Total: {len(cards)}."
                 self._saved_card_redirect(form.get("offset", "0"), len(cards))
                 return
             if self.path == "/discard":
                 form = self._form()
+                stack = _require_stack(self.state, form); pending = stack["pending"]
                 index = int(form.get("index", "-1"))
-                if 0 <= index < len(self.state.pending):
-                    self.state.pending.pop(index)
+                if 0 <= index < len(pending) and (not form.get("card_id") or pending[index].get("id") == form.get("card_id")):
+                    pending.pop(index); _persist_pending(self.state, pending, stack["id"])
                     self.state.message = "Discarded card."
                 self._redirect()
                 return
             if self.path == "/update":
                 form = self._form()
+                stack = _require_stack(self.state, form); pending = stack["pending"]
                 index = int(form.get("index", "-1"))
-                if 0 <= index < len(self.state.pending):
+                if 0 <= index < len(pending) and (not form.get("card_id") or pending[index].get("id") == form.get("card_id")):
                     self._update_pending_card(index, form)
-                    validate_cards(self.state.pending)
+                    pending = self.state.pending; validate_cards(pending); _persist_pending(self.state, pending, stack["id"])
                     self.state.message = "Updated card."
                 self._redirect()
                 return
             if self.path == "/export":
                 form = self._form()
                 export_mode = form.get("mode", "new")
+                scope = form.get("scope", "selected")
                 if export_mode not in {"new", "all"}:
                     raise ValueError("Unknown export mode.")
+                if scope not in {"selected", "all"}: raise ValueError("Unknown export scope.")
+                if scope == "selected": _require_stack(self.state, form)
                 try:
+                    output_path = self.state.output_path
+                    if scope == "selected" and apkg_output_path(output_path).name == apkg_output_path(DECK_PATH).name:
+                        output_path = stack_output_path(output_path, self.state.active_stack)
                     self.state.last_export = build_deck(
                         self.state.cards_path,
-                        self.state.output_path,
+                        output_path,
                         export_mode=export_mode,
+                        stack_id=form.get("stack_id") or None,
+                        scope=scope,
                     )
                     self._redirect("/deck")
                     return
                 except NoUnexportedCards:
-                    existing_export = apkg_output_path(self.state.output_path)
-                    if export_mode == "new" and existing_export.exists():
-                        self.state.last_export = existing_export
-                        self._redirect("/deck")
-                        return
                     self.state.message = (
                         "No new unexported cards to export, and no deck file exists yet."
                         if export_mode == "new"
@@ -1097,7 +1225,7 @@ def make_server(host: str, port: int, state: WebState) -> ThreadingHTTPServer:
         pass
 
     Handler.state = state
-    return ThreadingHTTPServer((host, port), Handler)
+    return ExclusiveThreadingHTTPServer((host, port), Handler)
 
 
 def run_server(
@@ -1143,13 +1271,19 @@ def main(argv: list[str] | None = None) -> int:
         stop_server(args.host, args.port)
         print("Stop requested.")
         return 0
-    run_server(
-        host=args.host,
-        port=args.port,
-        cards_path=args.cards,
-        output_path=args.output,
-        open_browser=not args.no_browser,
-    )
+    try:
+        run_server(
+            host=args.host,
+            port=args.port,
+            cards_path=args.cards,
+            output_path=args.output,
+            open_browser=not args.no_browser,
+        )
+    except OSError as exc:
+        if getattr(exc, "winerror", None) == 10048 or getattr(exc, "errno", None) in {48, 98}:
+            print(f"AutoAnki is already running at http://{args.host}:{args.port}/")
+            return 1
+        raise
     return 0
 
 

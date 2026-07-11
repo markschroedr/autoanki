@@ -7,7 +7,7 @@ import urllib.request
 from pathlib import Path
 
 from autoanki.generator import OpenRouterCardGenerator
-from autoanki.storage import load_cards
+from autoanki.storage import create_stack, load_cards, load_store
 from autoanki.webui import WebState, make_server
 
 
@@ -44,9 +44,10 @@ def main() -> int:
         url = f"http://127.0.0.1:{server.server_port}"
         try:
             get(url, "/")
+            stack = create_stack("Real API E2E", state.cards_path)
             post(url, "/capture")
             if not state.pending:
-                raise RuntimeError("real API generated no pending cards")
+                raise RuntimeError(f"real API generated no pending cards: {state.error or state.llm_note or 'no provider detail'}")
             if not all(card.get("render_ok") for card in state.pending):
                 raise RuntimeError(f"render validation failed: {state.pending}")
 
@@ -72,7 +73,7 @@ def main() -> int:
                 raise RuntimeError("home route did not render saved cards newest-first preview")
 
             post(url, "/export")
-            if not state.output_path.exists() or state.output_path.stat().st_size < 1000:
+            if not state.last_export or not state.last_export.exists() or state.last_export.stat().st_size < 1000:
                 raise RuntimeError("deck export failed")
             deck = get(url, "/deck")
             if len(deck) < 1000:
@@ -83,7 +84,10 @@ def main() -> int:
             if thread.is_alive():
                 raise RuntimeError("server did not stop")
 
-            print(f"real webui e2e ok: generated={len(generated)}, deck_bytes={len(deck)}")
+            active = load_store(state.cards_path)["active_stack_id"]
+            if active != stack["id"]:
+                raise RuntimeError("generated cards were not kept in the selected stack")
+            print(f"real webui e2e ok: stack={stack['name']}, generated={len(generated)}, deck_bytes={len(deck)}")
             for index, card in enumerate(generated, start=1):
                 print(f"{index}. [{card['type']} | {','.join(card['tags'] or [])}] {card['front']}")
             return 0

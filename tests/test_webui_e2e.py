@@ -365,7 +365,7 @@ class WebUiE2ETests(unittest.TestCase):
             self.assertIn('"model-a"', html)
             self.assertIn('"model-b"', html)
 
-    def test_custom_prompt_can_be_saved_preset_and_cleared(self):
+    def test_custom_prompt_can_be_saved_and_cleared(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             custom_prompt_path = tmp_path / "custom_prompt.txt"
@@ -387,9 +387,6 @@ class WebUiE2ETests(unittest.TestCase):
                 self.post(url, "/prompt", {"action": "save", "custom_prompt": "Write cards in German."})
                 self.assertEqual(custom_prompt_path.read_text(encoding="utf-8").strip(), "Write cards in German.")
                 self.assertIn("Custom instructions active", self.get(url, "/"))
-
-                self.post(url, "/prompt", {"action": "regelungstechnik"})
-                self.assertIn("Regelungstechnik specialization", custom_prompt_path.read_text(encoding="utf-8"))
 
                 self.post(url, "/prompt", {"action": "clear"})
                 self.assertFalse(custom_prompt_path.exists())

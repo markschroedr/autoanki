@@ -59,9 +59,8 @@ You can switch provider, model, and target card count from the web UI. API keys 
 
 The WebUI also has a collapsed **Custom prompt** section. The generic system
 prompt always remains active; additional instructions are appended from the
-local `data/custom_prompt.txt` file. You can edit those instructions directly,
-return to generic-only generation, or enable the included Regelungstechnik
-preset. The custom file is ignored by Git.
+local `data/custom_prompt.txt` file. You can edit those instructions directly
+or return to generic-only generation. The custom file is ignored by Git.
 
 See `docs/providers.md` for OpenAI, Anthropic, and Gemini setup.
 

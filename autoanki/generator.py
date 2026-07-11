@@ -39,7 +39,6 @@ DEFAULT_TAGS = [
     "workflow",
 ]
 JSON_FENCE = re.compile(r"^```(?:json)?\s*(.*?)\s*```$", re.DOTALL)
-REGELUNGSTECHNIK_PROMPT_PATH = Path(__file__).resolve().parent / "prompts" / "regelungstechnik.txt"
 MAX_CUSTOM_PROMPT_LENGTH = 20_000
 
 
@@ -61,10 +60,6 @@ def save_custom_prompt(value: str, path: str | Path = CUSTOM_PROMPT_PATH) -> Pat
     file_path.parent.mkdir(parents=True, exist_ok=True)
     file_path.write_text(text + "\n", encoding="utf-8")
     return file_path
-
-
-def load_regelungstechnik_prompt() -> str:
-    return REGELUNGSTECHNIK_PROMPT_PATH.read_text(encoding="utf-8").strip()
 
 
 def configured_tags() -> list[str]:

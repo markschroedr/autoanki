@@ -11,7 +11,6 @@ from autoanki.generator import (
     list_provider_models,
     load_custom_prompt,
     load_dotenv,
-    load_regelungstechnik_prompt,
     provider_status,
     save_custom_prompt,
     set_provider_model,
@@ -115,12 +114,6 @@ class GeneratorTests(unittest.TestCase):
 
             save_custom_prompt("", path)
             self.assertFalse(path.exists())
-
-    def test_regelungstechnik_prompt_is_available_as_a_packaged_preset(self):
-        prompt = load_regelungstechnik_prompt()
-        self.assertIn("Regelungstechnik specialization", prompt)
-        self.assertIn("zustandsraum", prompt)
-        self.assertIn("configured allowed tags", prompt)
 
     @patch("autoanki.generator.urllib.request.urlopen")
     def test_list_provider_models_parses_openrouter_models(self, urlopen):

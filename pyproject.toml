@@ -22,7 +22,7 @@ autoanki-web = "autoanki.webui:main"
 packages = ["autoanki"]
 
 [tool.setuptools.package-data]
-autoanki = ["system_prompt.txt", "prompts/*.txt"]
+autoanki = ["system_prompt.txt"]
 
 [dependency-groups]
 release = [

@@ -23,7 +23,6 @@ from .generator import (
     configured_target_card_count,
     list_provider_models,
     load_custom_prompt,
-    load_regelungstechnik_prompt,
     provider_status,
     save_custom_prompt,
     set_provider_model,
@@ -468,7 +467,7 @@ def _custom_prompt_panel_html(path: str | Path = CUSTOM_PROMPT_PATH) -> str:
       <div class="provider-panel-body">
         <div class="prompt-copy">
           <strong>The generic prompt always stays enabled.</strong>
-          <span class="muted">Add subject-specific guidance here, use the Regelungstechnik preset, or clear the field to return to generic-only generation.</span>
+          <span class="muted">Add subject-specific guidance here, or clear the field to return to generic-only generation.</span>
         </div>
         <form class="provider-config" method="post" action="/prompt">
           <label>
@@ -477,7 +476,6 @@ def _custom_prompt_panel_html(path: str | Path = CUSTOM_PROMPT_PATH) -> str:
           </label>
           <div class="inline-actions">
             <button class="small primary" type="submit" name="action" value="save">Save custom prompt</button>
-            <button class="small" type="submit" name="action" value="regelungstechnik">Use Regelungstechnik preset</button>
             <button class="small" type="submit" name="action" value="clear">Generic only</button>
           </div>
         </form>
@@ -846,10 +844,7 @@ class QuickcapHandler(BaseHTTPRequestHandler):
             if self.path == "/prompt":
                 form = self._form()
                 action = form.get("action", "save")
-                if action == "regelungstechnik":
-                    value = load_regelungstechnik_prompt()
-                    message = "Enabled the Regelungstechnik custom prompt."
-                elif action == "clear":
+                if action == "clear":
                     value = ""
                     message = "Cleared custom instructions. Generic prompt only."
                 elif action == "save":

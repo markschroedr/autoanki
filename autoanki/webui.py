@@ -120,6 +120,9 @@ def _page(title: str, body: str) -> bytes:
     .llm-note {{ border-radius: 8px; padding: 12px 14px; margin: 12px 0; background: rgba(217, 155, 114, 0.14); border: 1px solid rgba(217, 155, 114, 0.35); }}
     .notice {{ background: rgba(72, 123, 96, 0.22); border: 1px solid rgba(112, 177, 139, 0.38); }}
     .error {{ background: rgba(147, 52, 43, 0.24); border: 1px solid rgba(240, 128, 111, 0.42); }}
+    .async-status {{ position: fixed; right: 18px; bottom: 18px; z-index: 20; max-width: min(380px, calc(100vw - 36px)); border: 1px solid rgba(217, 155, 114, 0.42); border-radius: 8px; padding: 10px 13px; background: rgba(38, 27, 21, 0.96); color: #f5efe7; box-shadow: 0 14px 36px rgba(0, 0, 0, 0.3); }}
+    .async-status.error {{ border-color: rgba(240, 128, 111, 0.55); color: #ffd8d0; }}
+    form.async-busy {{ opacity: 0.62; pointer-events: none; }}
     .summary {{ color: #b8a99b; margin: 12px 0 0; max-width: 610px; line-height: 1.5; }}
     .surface, .card, .empty, .drop-zone, .provider-panel {{
       border: 1px solid rgba(245, 239, 231, 0.075);
@@ -203,13 +206,81 @@ def _page(title: str, body: str) -> bytes:
     @media (max-width: 860px) {{ .pending-fields, .capture-grid {{ grid-template-columns: 1fr; }} .pending-fields label:nth-child(2), .pending-content-field {{ grid-column: auto; }} header.top {{ align-items: flex-start; flex-direction: column; }} }}
   </style>
   <script>
-    async function submitDrop(formData) {{
-      const response = await fetch('/upload', {{ method: 'POST', body: formData }});
-      if (response.redirected) {{
-        window.location.href = response.url;
-      }} else {{
-        window.location.reload();
+    function showAsyncStatus(message, isError = false) {{
+      let status = document.querySelector('[data-async-status]');
+      if (!status) {{
+        status = document.createElement('div');
+        status.dataset.asyncStatus = 'true';
+        document.body.appendChild(status);
       }}
+      status.className = isError ? 'async-status error' : 'async-status';
+      status.textContent = message;
+    }}
+    async function replacePageFromResponse(response) {{
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('application/vnd.anki')) {{
+        const blob = await response.blob();
+        const disposition = response.headers.get('content-disposition') || '';
+        const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filenameMatch ? filenameMatch[1] : 'autoanki.apkg';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(link.href);
+        await refreshPage();
+        return;
+      }}
+      const html = await response.text();
+      const documentFromResponse = new DOMParser().parseFromString(html, 'text/html');
+      const scrollTop = window.scrollY;
+      document.title = documentFromResponse.title;
+      document.body.replaceWith(documentFromResponse.body);
+      window.scrollTo(0, scrollTop);
+      installInteractions();
+    }}
+    async function refreshPage() {{
+      const response = await fetch(window.location.href, {{ headers: {{ 'X-Requested-With': 'fetch' }} }});
+      await replacePageFromResponse(response);
+    }}
+    async function requestAndRefresh(action, body, form, label) {{
+      if (form) form.classList.add('async-busy');
+      showAsyncStatus(label || 'Working...');
+      try {{
+        const response = await fetch(action, {{
+          method: 'POST',
+          body,
+          headers: {{ 'X-Requested-With': 'fetch' }}
+        }});
+        if (!response.ok) throw new Error('Request failed (' + response.status + ')');
+        await replacePageFromResponse(response);
+      }} catch (error) {{
+        if (form) form.classList.remove('async-busy');
+        showAsyncStatus(error.message || 'Request failed.', true);
+      }}
+    }}
+    async function submitDrop(formData) {{
+      await requestAndRefresh('/upload', formData, document.querySelector('[data-drop-zone]'), 'Generating cards...');
+    }}
+    function installAsyncForms() {{
+      document.querySelectorAll('form[method="post"]').forEach(form => {{
+        if (form.matches('[data-drop-zone]')) return;
+        form.addEventListener('submit', event => {{
+          event.preventDefault();
+          const submitter = event.submitter;
+          const action = (submitter && submitter.formAction) || form.action;
+          const formData = new FormData(form);
+          if (submitter && submitter.name && !formData.has(submitter.name)) {{
+            formData.append(submitter.name, submitter.value);
+          }}
+          const body = (form.enctype || '').toLowerCase() === 'multipart/form-data'
+            ? formData
+            : new URLSearchParams(formData);
+          const label = (submitter && submitter.textContent.trim()) || 'Saving...';
+          requestAndRefresh(action, body, form, label);
+        }});
+      }});
     }}
     function installDropZone() {{
       const zone = document.querySelector('[data-drop-zone]');
@@ -275,10 +346,12 @@ def _page(title: str, body: str) -> bytes:
         }});
       }}
     }}
-    window.addEventListener('DOMContentLoaded', () => {{
+    function installInteractions() {{
       installDropZone();
       installProviderConfig();
-    }});
+      installAsyncForms();
+    }}
+    window.addEventListener('DOMContentLoaded', installInteractions);
   </script>
 </head>
 <body>

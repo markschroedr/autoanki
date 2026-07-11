@@ -87,6 +87,9 @@ class WebUiE2ETests(unittest.TestCase):
                 self.assertNotIn("local study tool", home)
                 self.assertNotIn("saved cards /", home)
                 self.assertNotIn("Capture from the clipboard or drop", home)
+                self.assertIn("installAsyncForms", home)
+                self.assertIn("requestAndRefresh", home)
+                self.assertNotIn("window.location.reload()", home)
 
                 self.post(url, "/capture")
                 home = self.get(url, "/")

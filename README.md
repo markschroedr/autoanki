@@ -81,7 +81,6 @@ uv run python -m scripts.real_webui_e2e            # real-provider smoke test
 autoanki/    application package and editable prompts
 scripts/     maintenance and smoke tests
 tests/       test suite
-experiments/ earlier prototypes
 ```
 
 PyInstaller build: `docs/release.md`.

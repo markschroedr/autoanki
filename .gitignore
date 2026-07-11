@@ -11,6 +11,7 @@ dist/
 release/
 data/
 output/
+experiments/
 cards.json
 cards.backup_*.json
 rt_quickcap.apkg

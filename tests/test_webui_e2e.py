@@ -93,6 +93,8 @@ class WebUiE2ETests(unittest.TestCase):
                 self.assertIn("sinusoidal steady-state", home)
                 self.assertIn("Pending cards", home)
                 self.assertIn("katex", home.lower())
+                self.assertIn("field-preview", home)
+                self.assertIn("Edit source", home)
                 self.assertIn("Accept</button>", home)
                 self.assertNotIn("Accept Pending", home)
 

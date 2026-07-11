@@ -28,7 +28,7 @@ from .generator import (
     set_provider_model,
 )
 from .paths import CARDS_PATH, CUSTOM_PROMPT_PATH, DECK_PATH
-from .preview import render_cards_html
+from .preview import _render_text, render_cards_html
 from .quickcap import capture_clipboard, generate_with_note, hydrate_cards
 from .storage import append_cards, load_cards, save_cards
 from .validate import configured_tags, validate_cards
@@ -163,6 +163,14 @@ def _page(title: str, body: str) -> bytes:
     .pending-fields {{ display: grid; grid-template-columns: 100px minmax(0, 1fr) 190px; gap: 8px; align-items: start; }}
     .pending-fields label {{ display: grid; gap: 5px; color: #a9998b; font-size: 13px; }}
     .pending-fields label:nth-child(2) {{ grid-column: span 2; }}
+    .pending-content-field {{ grid-column: span 2; }}
+    .field-preview {{ min-height: 62px; padding: 12px; border: 1px solid rgba(245, 239, 231, 0.1); border-radius: 7px; background: rgba(18, 15, 13, 0.52); color: #f5efe7; line-height: 1.5; }}
+    .field-preview .katex {{ font-size: 1em; }}
+    .field-source {{ margin-top: 7px; }}
+    .field-source > summary {{ color: #b8a99b; cursor: pointer; font-size: 12px; list-style: none; }}
+    .field-source > summary::before {{ content: "✎ "; color: #d99b72; }}
+    .field-source > summary::-webkit-details-marker {{ display: none; }}
+    .field-source textarea {{ margin-top: 7px; min-height: 108px; resize: vertical; }}
     .pending-card textarea {{ min-height: 92px; resize: vertical; }}
     .pending-card footer {{ display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; }}
     .saved-card-actions {{ display: grid; grid-template-columns: max-content max-content; justify-content: end; gap: 8px; margin-top: 14px; }}
@@ -192,7 +200,7 @@ def _page(title: str, body: str) -> bytes:
     .help-page p, .help-page li {{ color: #dacabb; line-height: 1.62; }}
     .help-page ul {{ margin: 0; padding-left: 20px; }}
     .help-page code {{ color: #ffd0ad; background: rgba(245, 239, 231, 0.08); border-radius: 5px; padding: 2px 5px; }}
-    @media (max-width: 860px) {{ .pending-fields, .capture-grid {{ grid-template-columns: 1fr; }} .pending-fields label:nth-child(2) {{ grid-column: auto; }} header.top {{ align-items: flex-start; flex-direction: column; }} }}
+    @media (max-width: 860px) {{ .pending-fields, .capture-grid {{ grid-template-columns: 1fr; }} .pending-fields label:nth-child(2), .pending-content-field {{ grid-column: auto; }} header.top {{ align-items: flex-start; flex-direction: column; }} }}
   </style>
   <script>
     async function submitDrop(formData) {{
@@ -499,6 +507,23 @@ def _pending_card_editor(card: dict[str, Any], index: int) -> str:
         else ""
     )
     status = "ok" if card.get("render_ok") else "bad"
+    front = card.get("front", "")
+    back = card.get("back", "")
+    front_preview = _render_text(front) or '<span class="muted">No front text</span>'
+    back_preview = _render_text(back) or '<span class="muted">No back text</span>'
+
+    def source_field(label: str, name: str, raw: str, rendered: str) -> str:
+        return f"""
+        <label class="pending-content-field">
+          {label}
+          <div class="field-preview">{rendered}</div>
+          <details class="field-source">
+            <summary>Edit source</summary>
+            <textarea name="{name}">{html.escape(raw)}</textarea>
+          </details>
+        </label>
+        """
+
     return f"""
     <form class="card pending-card {status}" method="post" action="/update">
       <header>
@@ -515,14 +540,8 @@ def _pending_card_editor(card: dict[str, Any], index: int) -> str:
           Tags
           <input name="tags" value="{html.escape(tags)}" aria-label="tags">
         </label>
-        <label>
-          Front
-          <textarea name="front">{html.escape(card.get("front", ""))}</textarea>
-        </label>
-        <label>
-          Back
-          <textarea name="back">{html.escape(card.get("back", ""))}</textarea>
-        </label>
+        {source_field("Front", "front", front, front_preview)}
+        {source_field("Back", "back", back, back_preview)}
       </div>
       {error_html}
       {warning_html}

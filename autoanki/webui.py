@@ -118,13 +118,20 @@ def _page(title: str, body: str) -> bytes:
       box-shadow: 0 14px 44px rgba(0, 0, 0, 0.12);
       backdrop-filter: blur(8px);
     }}
-    .capture-grid {{ display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr); gap: 14px; margin: 12px 0 10px; }}
+    .capture-grid {{ display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr); gap: 14px; align-items: start; margin: 12px 0 10px; }}
     .drop-zone {{ min-height: 168px; padding: 24px; display: grid; place-items: center; text-align: center; position: relative; overflow: hidden; }}
     .drop-zone.dragging {{ border-color: #c58361; background: rgba(173, 105, 72, 0.08); }}
     .drop-zone strong {{ display: block; font-family: Georgia, "Times New Roman", serif; font-size: 25px; font-weight: 400; margin-bottom: 9px; }}
     .drop-zone p, .muted {{ color: #a9998b; margin: 0; line-height: 1.5; }}
     .drop-zone input {{ position: absolute; inset: 0; opacity: 0; cursor: pointer; }}
-    .provider-panel {{ padding: 18px; }}
+    .provider-panel {{ overflow: hidden; }}
+    .provider-panel > summary {{ display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; cursor: pointer; list-style: none; }}
+    .provider-panel > summary::-webkit-details-marker {{ display: none; }}
+    .provider-panel > summary::before {{ content: "›"; color: #d99b72; font-size: 22px; line-height: 1; transition: transform 140ms ease; }}
+    .provider-panel[open] > summary::before {{ transform: rotate(90deg); }}
+    .provider-panel > summary strong {{ margin-right: auto; font-size: 14px; text-transform: uppercase; letter-spacing: 0.08em; color: #d99b72; }}
+    .provider-summary-meta {{ color: #a9998b; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+    .provider-panel-body {{ padding: 4px 18px 18px; border-top: 1px solid rgba(245, 239, 231, 0.075); }}
     .provider-row {{ display: grid; grid-template-columns: 88px 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid rgba(245, 239, 231, 0.08); }}
     .provider-row:first-of-type {{ border-top: 0; }}
     .provider-config {{ display: grid; gap: 9px; margin-top: 14px; }}
@@ -222,10 +229,18 @@ def _page(title: str, body: str) -> bytes:
     function installProviderConfig() {{
       const provider = document.querySelector('[data-provider-select]');
       const loadButton = document.querySelector('[data-load-models]');
+      const panel = document.querySelector('[data-provider-panel]');
       if (!provider || !loadButton) return;
       provider.addEventListener('change', loadModels);
       loadButton.addEventListener('click', loadModels);
-      loadModels();
+      if (panel) {{
+        panel.addEventListener('toggle', () => {{
+          if (panel.open && !panel.dataset.modelsLoaded) {{
+            panel.dataset.modelsLoaded = 'true';
+            loadModels();
+          }}
+        }});
+      }}
     }}
     window.addEventListener('DOMContentLoaded', () => {{
       installDropZone();
@@ -327,31 +342,36 @@ def _provider_panel_html() -> str:
         selected = " selected" if item["name"] == active_provider else ""
         provider_options.append(f'<option value="{html.escape(item["name"])}"{selected}>{html.escape(item["name"])}</option>')
     return f"""
-    <aside class="provider-panel">
-      <h2>Model provider</h2>
-      {''.join(rows)}
-      <form class="provider-config" method="post" action="/config">
-        <label>
-          Provider
-          <select name="provider" data-provider-select>{''.join(provider_options)}</select>
-        </label>
-        <label>
-          Model
-          <input name="model" data-model-input list="model-options" value="{html.escape(active_model)}" placeholder="model slug">
-          <datalist id="model-options"></datalist>
-        </label>
-        <label>
-          Cards to aim for
-          <input name="target_card_count" type="number" min="1" max="12" step="1" value="{configured_target_card_count()}">
-        </label>
-        <div class="inline-actions">
-          <button class="small" type="submit">Save</button>
-          <button class="small" type="button" data-load-models>Load models</button>
-        </div>
-        <div class="model-status" data-model-status></div>
-      </form>
-      <p class="muted">Keys stay in your local .env file. The UI only saves provider, model, and card count.</p>
-    </aside>
+    <details class="provider-panel" data-provider-panel>
+      <summary>
+        <strong>Model provider</strong>
+        <span class="provider-summary-meta">{html.escape(active_provider)} · {html.escape(active_model)}</span>
+      </summary>
+      <div class="provider-panel-body">
+        {''.join(rows)}
+        <form class="provider-config" method="post" action="/config">
+          <label>
+            Provider
+            <select name="provider" data-provider-select>{''.join(provider_options)}</select>
+          </label>
+          <label>
+            Model
+            <input name="model" data-model-input list="model-options" value="{html.escape(active_model)}" placeholder="model slug">
+            <datalist id="model-options"></datalist>
+          </label>
+          <label>
+            Cards to aim for
+            <input name="target_card_count" type="number" min="1" max="12" step="1" value="{configured_target_card_count()}">
+          </label>
+          <div class="inline-actions">
+            <button class="small" type="submit">Save</button>
+            <button class="small" type="button" data-load-models>Load models</button>
+          </div>
+          <div class="model-status" data-model-status></div>
+        </form>
+        <p class="muted">Keys stay in your local .env file. The UI only saves provider, model, and card count.</p>
+      </div>
+    </details>
     """
 
 

@@ -275,6 +275,8 @@ class WebUiE2ETests(unittest.TestCase):
                 self.assertIn('name="model"', home)
                 self.assertIn('name="target_card_count"', home)
                 self.assertIn("Load models", home)
+                self.assertIn('<details class="provider-panel" data-provider-panel>', home)
+                self.assertNotIn('<details class="provider-panel" data-provider-panel open>', home)
 
                 with patch("autoanki.webui.set_provider_model", return_value=tmp_path / ".env") as set_provider_model:
                     self.post(

@@ -6,7 +6,8 @@ from autoanki.preview import _render_katex, render_preview_html
 
 
 class PreviewTests(unittest.TestCase):
-    def test_preview_contains_mathjax_and_clipboard_image(self):
+    @patch("autoanki.preview._render_katex", return_value=None)
+    def test_preview_contains_mathjax_and_clipboard_image(self, _render_katex):
         html = render_preview_html(
             [
                 {

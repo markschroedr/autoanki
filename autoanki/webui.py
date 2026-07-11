@@ -88,6 +88,8 @@ def _page(title: str, body: str) -> bytes:
     body {{
       margin: 0;
       min-height: 100vh;
+      display: flow-root;
+      overflow-x: hidden;
       background:
         radial-gradient(circle at 12% -8%, rgba(194, 116, 73, 0.105), transparent 34rem),
         linear-gradient(145deg, #12100e 0%, #171411 54%, #11100f 100%);

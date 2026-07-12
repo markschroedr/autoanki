@@ -2,6 +2,7 @@
 
 import sys
 
+icon_path = "assets/autoanki.icns" if sys.platform == "darwin" else "assets/autoanki.ico"
 
 a = Analysis(
     ["scripts/launch_desktop.py"],
@@ -32,6 +33,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
+    icon=icon_path,
     codesign_identity=None,
     entitlements_file=None,
 )
@@ -49,7 +51,7 @@ if sys.platform == "darwin":
     app = BUNDLE(
         coll,
         name="AutoAnki.app",
-        icon=None,
+        icon=icon_path,
         bundle_identifier="com.markschroedr.autoanki",
         info_plist={
             "CFBundleDisplayName": "AutoAnki",

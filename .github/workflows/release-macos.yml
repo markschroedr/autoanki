@@ -34,6 +34,18 @@ jobs:
       - name: Run tests
         run: uv run python -m unittest discover -s tests
 
+      - name: Build macOS app icon
+        run: |
+          mkdir -p build/AutoAnki.iconset
+          for size in 16 32 128 256 512; do
+            sips -z "$size" "$size" assets/autoanki-1024.png \
+              --out "build/AutoAnki.iconset/icon_${size}x${size}.png" >/dev/null
+            double=$((size * 2))
+            sips -z "$double" "$double" assets/autoanki-1024.png \
+              --out "build/AutoAnki.iconset/icon_${size}x${size}@2x.png" >/dev/null
+          done
+          iconutil -c icns build/AutoAnki.iconset -o assets/autoanki.icns
+
       - name: Build native app
         run: uv run pyinstaller autoanki.spec --noconfirm --clean
 

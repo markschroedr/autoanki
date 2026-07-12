@@ -1,0 +1,82 @@
+name: Build macOS release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to attach the build to
+        required: true
+        default: v0.2.0
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos-arm64:
+    runs-on: macos-15
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python
+        run: uv python install 3.12
+
+      - name: Install release dependencies
+        run: uv sync --locked --group release
+
+      - name: Run tests
+        run: uv run python -m unittest discover -s tests
+
+      - name: Build native app
+        run: uv run pyinstaller autoanki.spec --noconfirm --clean
+
+      - name: Assemble portable folder
+        run: |
+          stage="release/AutoAnki-Portable-macOS-arm64"
+          mkdir -p "$stage/data" "$stage/exports"
+          cp -R dist/AutoAnki.app "$stage/AutoAnki.app"
+          cp .env.example "$stage/.env.example"
+          cp docs/PORTABLE_README_MACOS.txt "$stage/README.txt"
+          cp docs/PORTABLE_DATA_README.txt "$stage/data/README.txt"
+          cp docs/PORTABLE_EXPORTS_README.txt "$stage/exports/README.txt"
+
+      - name: Smoke-test packaged UI
+        run: |
+          executable="release/AutoAnki-Portable-macOS-arm64/AutoAnki.app/Contents/MacOS/AutoAnki"
+          "$executable" &
+          app_pid=$!
+          trap 'kill "$app_pid" 2>/dev/null || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:8765/ | grep --quiet AutoAnki; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Packaged AutoAnki UI did not become ready" >&2
+          exit 1
+
+      - name: Create portable ZIP
+        run: |
+          cd release
+          zip -qry AutoAnki-Portable-macOS-arm64.zip AutoAnki-Portable-macOS-arm64
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AutoAnki-Portable-macOS-arm64
+          path: release/AutoAnki-Portable-macOS-arm64.zip
+
+      - name: Attach ZIP to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload "${{ inputs.release_tag }}"
+          release/AutoAnki-Portable-macOS-arm64.zip
+          --clobber

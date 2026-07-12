@@ -27,3 +27,13 @@ in the portable folder's `.env` file.
 The archive contains only the entry point and runtime support at its top level,
 plus `data/` for cards and `exports/` for generated Anki packages. Keep the
 whole folder together when moving it between computers.
+
+## macOS
+
+Run the **Build macOS release** workflow manually and provide an existing
+release tag. GitHub builds and tests the unsigned Apple Silicon app on a native
+macOS runner, then attaches `AutoAnki-Portable-macOS-arm64.zip` to that release.
+
+Unsigned builds require a one-time Control-click **Open** confirmation in
+Gatekeeper. Code signing and notarization require Apple Developer credentials
+and are intentionally not part of this workflow.

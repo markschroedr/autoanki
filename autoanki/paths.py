@@ -4,7 +4,11 @@ from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
 if getattr(sys, "frozen", False):
-    PROJECT_ROOT = Path(sys.executable).resolve().parent
+    executable = Path(sys.executable).resolve()
+    if sys.platform == "darwin" and executable.parent.name == "MacOS":
+        PROJECT_ROOT = executable.parents[3]
+    else:
+        PROJECT_ROOT = executable.parent
 elif (SOURCE_ROOT / "pyproject.toml").exists():
     PROJECT_ROOT = SOURCE_ROOT
 else:

@@ -1,5 +1,7 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+
 
 a = Analysis(
     ["scripts/launch_desktop.py"],
@@ -42,3 +44,15 @@ coll = COLLECT(
     upx_exclude=[],
     name="AutoAnki",
 )
+
+if sys.platform == "darwin":
+    app = BUNDLE(
+        coll,
+        name="AutoAnki.app",
+        icon=None,
+        bundle_identifier="com.markschroedr.autoanki",
+        info_plist={
+            "CFBundleDisplayName": "AutoAnki",
+            "NSHighResolutionCapable": True,
+        },
+    )

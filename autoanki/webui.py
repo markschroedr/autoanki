@@ -4,6 +4,7 @@ import argparse
 import base64
 import email
 import html
+import io
 import json
 import sys
 import threading
@@ -21,6 +22,7 @@ from .build_deck import NoUnexportedCards, apkg_output_path, build_deck, stack_o
 from .generator import (
     OpenRouterCardGenerator,
     configured_target_card_count,
+    image_to_b64,
     list_provider_models,
     load_custom_prompt,
     provider_status,
@@ -157,6 +159,7 @@ def _page(title: str, body: str) -> bytes:
       transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
     }}
     button:hover, a.button:hover {{ border-color: rgba(199, 143, 107, 0.48); background: rgba(245, 245, 245, 0.065); transform: translateY(-1px); }}
+    button:disabled {{ opacity: 0.42; cursor: not-allowed; transform: none; }}
     button:focus-visible, a.button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {{ outline: 2px solid rgba(199, 143, 107, 0.72); outline-offset: 2px; }}
     button.primary {{ background: var(--ochre-strong); border-color: #c27b59; color: #16110e; font-weight: 700; }}
     button.danger {{ background: rgba(107, 48, 43, 0.42); border-color: rgba(240, 128, 111, 0.32); color: #ffe9e4; }}
@@ -174,7 +177,7 @@ def _page(title: str, body: str) -> bytes:
     .async-status.error {{ border-color: rgba(240, 128, 111, 0.55); color: #ffd8d0; }}
     form.async-busy {{ opacity: 0.62; pointer-events: none; }}
     .summary {{ color: var(--muted); margin: 12px 0 0; max-width: 610px; line-height: 1.5; }}
-    .surface, .card, .empty, .drop-zone, .provider-panel {{
+    .surface, .card, .empty, .provider-panel {{
       border: 1px solid var(--line);
       border-radius: 10px;
       background: var(--surface);
@@ -204,12 +207,38 @@ def _page(title: str, body: str) -> bytes:
     .stack-danger-controls {{ display: flex; gap: 8px; align-items: end; }}
     .stack-danger-controls label {{ display: grid; gap: 5px; color: #d8aaa2; font-size: 12px; }}
     .stack-danger-controls input {{ width: 190px; min-height: 39px; }}
+    .export-menu {{ position: relative; }}
+    .export-menu > summary {{ display: inline-flex; min-height: 38px; align-items: center; justify-content: center; gap: 8px; padding: 8px 13px; border: 1px solid var(--line); border-radius: 8px; background: rgba(245, 239, 231, 0.035); color: var(--text); cursor: pointer; list-style: none; font-size: 14px; line-height: 1; }}
+    .export-menu > summary::-webkit-details-marker {{ display: none; }}
+    .export-menu > summary::after {{ content: "⌄"; display: inline-flex; height: 14px; align-items: center; color: var(--ochre); font-size: 13px; line-height: 1; transform: translateY(-1px); }}
+    .export-menu[open] > summary {{ border-color: rgba(199, 143, 107, 0.48); background: rgba(245, 245, 245, 0.065); }}
+    .export-popover {{ position: absolute; z-index: 30; top: calc(100% + 8px); left: 0; width: min(270px, calc(100vw - 24px)); padding: 7px; border: 1px solid rgba(199, 143, 107, 0.26); border-radius: 10px; background: #191817; box-shadow: 0 20px 55px rgba(0, 0, 0, 0.42); }}
+    .export-option {{ display: block; }}
+    .export-option + .export-option {{ margin-top: 3px; }}
+    .export-option button {{ display: flex; width: 100%; min-height: 45px; align-items: center; justify-content: space-between; gap: 12px; border-color: transparent; background: transparent; text-align: left; }}
+    .export-option button:hover {{ border-color: var(--line); background: rgba(245, 239, 231, 0.055); transform: none; }}
+    .export-option-name {{ font-weight: 600; }}
+    .export-option-count {{ color: var(--muted); font-size: 12px; font-weight: 400; }}
+    .stop-action {{ margin-left: 7px; padding-left: 14px; border-left: 1px solid var(--line); }}
+    .latest-export {{ display: flex; justify-content: space-between; gap: 10px; align-items: center; padding: 10px 9px 4px; border-top: 1px solid var(--line); }}
+    .latest-export span {{ min-width: 0; overflow: hidden; color: var(--muted); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }}
     .capture-grid {{ display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(300px, 0.75fr); gap: 14px; align-items: stretch; margin: 12px 0 10px; }}
-    .drop-zone {{ min-height: 172px; padding: 28px; display: grid; place-items: center; text-align: center; position: relative; overflow: hidden; }}
-    .drop-zone.dragging {{ border-color: #c58361; background: rgba(173, 105, 72, 0.08); }}
-    .drop-zone strong {{ display: block; font-family: Georgia, "Times New Roman", serif; font-size: 27px; font-weight: 400; margin-bottom: 9px; }}
-    .drop-zone p, .muted {{ color: var(--muted); margin: 0; line-height: 1.5; }}
-    .drop-zone input {{ position: absolute; inset: 0; opacity: 0; cursor: pointer; }}
+    .ingest-panel {{ display: grid; align-content: start; padding: 18px; }}
+    .ingest-heading {{ display: flex; justify-content: space-between; gap: 14px; align-items: baseline; margin-bottom: 11px; }}
+    .ingest-heading strong {{ font-family: Georgia, "Times New Roman", serif; font-size: 24px; font-weight: 400; }}
+    .ingest-heading span {{ color: var(--muted); font-size: 12px; }}
+    .drop-zone {{ display: grid; gap: 10px; }}
+    .drop-zone.dragging {{ border-radius: 8px; outline: 2px solid rgba(199, 143, 107, 0.62); outline-offset: 5px; }}
+    .ingest-text {{ min-height: 126px; resize: vertical; line-height: 1.5; }}
+    .ingest-footer {{ display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }}
+    .ingest-actions {{ display: flex; gap: 8px; align-items: center; margin-left: auto; padding-left: 12px; border-left: 1px solid var(--line); }}
+    .capture-primary {{ min-height: 42px; padding-inline: 17px; }}
+    .capture-primary span {{ display: block; font-size: 11px; font-weight: 500; opacity: 0.72; }}
+    .file-picker-button {{ display: inline-flex; min-height: 38px; align-items: center; padding: 8px 13px; border: 1px solid var(--line); border-radius: 8px; background: rgba(245, 239, 231, 0.035); color: var(--text); cursor: pointer; font-size: 14px; }}
+    .file-picker-button:hover {{ border-color: rgba(199, 143, 107, 0.48); background: rgba(245, 245, 245, 0.065); }}
+    .file-picker-button input {{ position: absolute; width: 1px; height: 1px; overflow: hidden; opacity: 0; pointer-events: none; }}
+    .drop-copy {{ color: var(--muted); font-size: 12px; }}
+    [hidden] {{ display: none !important; }}
     .provider-panel {{ overflow: hidden; }}
     .provider-panel > summary {{ display: flex; min-height: 70px; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 18px; cursor: pointer; list-style: none; }}
     .provider-panel > summary::-webkit-details-marker {{ display: none; }}
@@ -288,6 +317,10 @@ def _page(title: str, body: str) -> bytes:
       .pending-fields label:nth-child(2), .pending-content-field {{ grid-column: auto; }}
       .provider-panel > summary {{ min-height: 58px; }}
     }}
+    @media (max-width: 760px) {{
+      .ingest-footer {{ display: grid; grid-template-columns: auto minmax(0, 1fr); }}
+      .ingest-actions {{ grid-column: 1 / -1; justify-content: flex-end; margin-left: 0; padding: 10px 0 0; border-top: 1px solid var(--line); border-left: 0; }}
+    }}
     @media (max-width: 560px) {{
       main {{ width: min(100% - 22px, 520px); margin: 22px auto 48px; }}
       h1 {{ font-size: clamp(36px, 12vw, 48px); }}
@@ -295,7 +328,14 @@ def _page(title: str, body: str) -> bytes:
       .actions form, .actions a.button, .actions button {{ width: 100%; }}
       .actions a.button, .actions button {{ text-align: center; }}
       .capture-grid {{ gap: 10px; }}
-      .drop-zone {{ min-height: 150px; padding: 22px 16px; }}
+      .ingest-panel {{ padding: 14px; }}
+      .ingest-heading {{ align-items: flex-start; flex-direction: column; gap: 3px; }}
+      .ingest-footer {{ grid-template-columns: 1fr; }}
+      .ingest-footer .file-picker-button {{ width: 100%; text-align: center; justify-content: center; }}
+      .drop-copy {{ text-align: center; }}
+      .ingest-actions {{ grid-column: 1 / -1; display: grid; grid-template-columns: 1fr; margin-left: 0; padding: 10px 0 0; border-left: 0; border-top: 1px solid var(--line); }}
+      .ingest-actions button {{ width: 100%; text-align: center; justify-content: center; }}
+      .capture-primary {{ grid-row: 1; }}
       .provider-panel > summary {{ padding-inline: 14px; }}
       .provider-summary-meta {{ max-width: 48%; }}
       .card {{ padding: 16px; }}
@@ -307,6 +347,10 @@ def _page(title: str, body: str) -> bytes:
       .stack-main {{ grid-template-columns: 1fr; }}
       .stack-meta {{ padding: 0; }}
       .stack-danger-controls input {{ width: 100%; }}
+      .export-menu {{ position: static; }}
+      .export-menu > summary {{ text-align: center; }}
+      .export-popover {{ position: fixed; inset: auto 11px 11px; width: auto; max-height: calc(100vh - 22px); overflow-y: auto; }}
+      .stop-action {{ margin-left: 0; padding-left: 0; border-left: 0; }}
     }}
   </style>
   <script>
@@ -372,7 +416,6 @@ def _page(title: str, body: str) -> bytes:
     }}
     function installAsyncForms() {{
       document.querySelectorAll('form[method="post"]').forEach(form => {{
-        if (form.matches('[data-drop-zone]')) return;
         form.addEventListener('submit', event => {{
           event.preventDefault();
           const submitter = event.submitter;
@@ -394,14 +437,26 @@ def _page(title: str, body: str) -> bytes:
     function installDropZone() {{
       const zone = document.querySelector('[data-drop-zone]');
       const picker = document.querySelector('[data-file-picker]');
-      if (!zone || !picker) return;
-      const sendFiles = (files, text) => {{
-        const data = new FormData();
-        for (const file of files) data.append('files', file);
-        if (text) data.append('text', text);
-        submitDrop(data);
+      const fileStatus = document.querySelector('[data-file-status]');
+      const textInput = zone && zone.querySelector('textarea[name="text"]');
+      const generateButton = zone && zone.querySelector('[data-generate-input]');
+      if (!zone || !picker || !textInput || !generateButton) return;
+      const supportedFile = file => {{
+        const name = file.name.toLowerCase();
+        return ['.png', '.jpg', '.jpeg', '.webp', '.gif', '.txt', '.md'].some(extension => name.endsWith(extension));
       }};
-      picker.addEventListener('change', () => sendFiles(picker.files, ''));
+      const updateInputState = () => {{
+        const hasInput = Boolean(textInput.value.trim()) || picker.files.length > 0;
+        generateButton.hidden = !hasInput;
+        if (!fileStatus) return;
+        fileStatus.textContent = picker.files.length
+          ? picker.files.length + (picker.files.length === 1 ? ' supported file selected' : ' supported files selected')
+          : 'or drop images, .txt, or .md';
+      }};
+      picker.addEventListener('change', () => {{
+        updateInputState();
+      }});
+      textInput.addEventListener('input', updateInputState);
       for (const eventName of ['dragenter', 'dragover']) {{
         zone.addEventListener(eventName, event => {{
           event.preventDefault();
@@ -414,8 +469,21 @@ def _page(title: str, body: str) -> bytes:
       zone.addEventListener('drop', event => {{
         event.preventDefault();
         const text = event.dataTransfer.getData('text/plain');
-        sendFiles(event.dataTransfer.files, text);
+        const files = Array.from(event.dataTransfer.files);
+        const unsupported = files.filter(file => !supportedFile(file));
+        if (unsupported.length) {{
+          if (fileStatus) fileStatus.textContent = 'Unsupported: ' + unsupported.map(file => file.name).join(', ');
+          return;
+        }}
+        if (files.length) {{
+          const transfer = new DataTransfer();
+          files.forEach(file => transfer.items.add(file));
+          picker.files = transfer.files;
+        }}
+        if (text && !files.length) textInput.value = [textInput.value.trim(), text.trim()].filter(Boolean).join('\n\n');
+        updateInputState();
       }});
+      updateInputState();
     }}
     async function loadModels() {{
       const provider = document.querySelector('[data-provider-select]');
@@ -745,13 +813,20 @@ def _pending_card_editor(card: dict[str, Any], index: int, stack_id: str = "") -
 def _capture_html(custom_prompt_path: str | Path = CUSTOM_PROMPT_PATH) -> str:
     return f"""
     <section class="capture-grid">
-      <form class="drop-zone" data-drop-zone method="post" action="/upload" enctype="multipart/form-data">
-        <div>
-          <strong>Drop notes here</strong>
-          <p>Text files, pasted text, and images work. Clipboard capture stays available for screenshots and quick snippets.</p>
-        </div>
-        <input data-file-picker type="file" name="files" multiple accept="image/*,.txt,.md,text/plain">
-      </form>
+      <div class="surface ingest-panel">
+        <div class="ingest-heading"><strong>Add study material</strong><span>Type, paste, drop, or capture</span></div>
+        <form class="drop-zone" data-drop-zone method="post" action="/upload" enctype="multipart/form-data">
+          <textarea class="ingest-text" name="text" placeholder="Type or paste notes here…" aria-label="Study material"></textarea>
+          <div class="ingest-footer">
+            <label class="file-picker-button">Choose files<input data-file-picker type="file" name="files" multiple accept=".png,.jpg,.jpeg,.webp,.gif,.txt,.md,image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown"></label>
+            <span class="drop-copy" data-file-status>or drop images, .txt, or .md</span>
+            <div class="ingest-actions" aria-label="Generate cards">
+              <button type="submit" data-generate-input hidden>Generate from notes / files</button>
+              <button class="primary capture-primary" type="submit" formaction="/capture">Capture clipboard &amp; generate<span>Text or image</span></button>
+            </div>
+          </div>
+        </form>
+      </div>
       {_provider_panel_html()}
     </section>
     {_custom_prompt_panel_html(custom_prompt_path)}
@@ -816,6 +891,8 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
     pending_count = len(active["pending"])
     saved_cards = active["cards"]
     saved_count = len(saved_cards)
+    unexported_count = sum(1 for card in saved_cards if not card.get("exported_at"))
+    all_saved_count = sum(len(stack["cards"]) for stack in store["stacks"])
     message = f'<div class="notice">{html.escape(state.message)}</div>' if state.message else ""
     error = f'<div class="error">{html.escape(state.error)}</div>' if state.error else ""
     llm_note = f'<div class="llm-note"><strong>LLM note:</strong> {html.escape(state.llm_note)}</div>' if state.llm_note else ""
@@ -823,7 +900,7 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
     existing_export = state.last_export
     if existing_export and existing_export.exists():
         state.last_export = existing_export
-        export_link = f'<a class="button" href="/deck">Download .apkg</a>'
+        export_link = f'<div class="latest-export"><span title="{html.escape(existing_export.name)}">Latest: {html.escape(existing_export.name)}</span><a class="button" href="/deck">Download again</a></div>'
 
     if active["pending"]:
         pending_cards = "".join(_pending_card_editor(card, index, stack_id) for index, card in enumerate(active["pending"]))
@@ -876,27 +953,26 @@ def render_home(state: WebState, offset: int = 0) -> bytes:
       </details>
     </section>"""
 
+    export_menu = f"""
+      <details class="export-menu">
+        <summary>Export</summary>
+        <div class="export-popover">
+          <form method="post" action="/export" class="export-option"><input type="hidden" name="mode" value="new"><input type="hidden" name="scope" value="selected"><input type="hidden" name="stack_id" value="{stack_id}"><button type="submit"{' disabled' if unexported_count == 0 else ''}><span class="export-option-name">New cards</span><span class="export-option-count">{unexported_count}</span></button></form>
+          <form method="post" action="/export" class="export-option"><input type="hidden" name="mode" value="all"><input type="hidden" name="scope" value="selected"><input type="hidden" name="stack_id" value="{stack_id}"><button type="submit"{' disabled' if saved_count == 0 else ''}><span class="export-option-name">All cards</span><span class="export-option-count">{saved_count} in {html.escape(active['name'])}</span></button></form>
+          <form method="post" action="/export" class="export-option"><input type="hidden" name="mode" value="all"><input type="hidden" name="scope" value="all"><button type="submit"{' disabled' if all_saved_count == 0 else ''}><span class="export-option-name">All stacks</span><span class="export-option-count">{all_saved_count} total</span></button></form>
+          {export_link}
+        </div>
+      </details>"""
+
     body = f"""
     <header class="top">
       <div>
         <h1>AutoAnki Quickcap</h1>
       </div>
       <div class="actions">
-        <form method="post" action="/capture"><input type="hidden" name="stack_id" value="{stack_id}"><button class="primary" type="submit">Capture Clipboard</button></form>
-        <form method="post" action="/export">
-          <input type="hidden" name="mode" value="new">
-          <input type="hidden" name="scope" value="selected"><input type="hidden" name="stack_id" value="{stack_id}">
-          <button type="submit">Export new</button>
-        </form>
-        <form method="post" action="/export">
-          <input type="hidden" name="mode" value="all">
-          <input type="hidden" name="scope" value="selected"><input type="hidden" name="stack_id" value="{stack_id}">
-          <button type="submit">Rebuild all</button>
-        </form>
-        <form method="post" action="/export"><input type="hidden" name="mode" value="all"><input type="hidden" name="scope" value="all"><button type="submit">Export all stacks</button></form>
+        {export_menu}
         <a class="button" href="/help">How does this work?</a>
-        {export_link}
-        <form method="post" action="/stop"><button class="danger" type="submit">Stop</button></form>
+        <form method="post" action="/stop" class="stop-action"><button class="danger" type="submit">Stop</button></form>
       </div>
     </header>
     {message}
@@ -951,6 +1027,7 @@ class QuickcapHandler(BaseHTTPRequestHandler):
         )
         source: dict[str, Any] = {"text": None, "image_b64": None}
         text_parts: list[str] = []
+        unsupported_files: list[str] = []
         if not message.is_multipart():
             raise ValueError("Upload must be multipart form data")
         for part in message.get_payload():
@@ -966,11 +1043,24 @@ class QuickcapHandler(BaseHTTPRequestHandler):
                 continue
             if not filename or not payload:
                 continue
-            if media_type.startswith("image/") and source["image_b64"] is None:
-                source["image_b64"] = base64.b64encode(payload).decode("ascii")
+            suffix = Path(filename).suffix.lower()
+            if suffix in {".png", ".jpg", ".jpeg", ".webp", ".gif"} and media_type.startswith("image/"):
+                if source["image_b64"] is None:
+                    try:
+                        from PIL import Image
+
+                        with Image.open(io.BytesIO(payload)) as image:
+                            source["image_b64"] = image_to_b64(image.convert("RGB"))
+                    except Exception as exc:
+                        raise ValueError(f"Could not read image file: {filename}") from exc
                 continue
-            if media_type.startswith("text/") or filename.lower().endswith((".txt", ".md")):
+            if suffix in {".txt", ".md"}:
                 text_parts.append(payload.decode(part.get_content_charset() or "utf-8", errors="replace"))
+                continue
+            unsupported_files.append(filename)
+        if unsupported_files:
+            names = ", ".join(unsupported_files)
+            raise ValueError(f"Unsupported file type: {names}. Use images, .txt, or .md files.")
         text = "\n\n".join(part.strip() for part in text_parts if part.strip()).strip()
         if text:
             source["text"] = text

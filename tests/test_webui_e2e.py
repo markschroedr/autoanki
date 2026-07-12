@@ -88,6 +88,7 @@ class WebUiE2ETests(unittest.TestCase):
                 self.assertIn("Choose files", home)
                 self.assertIn("Generate from notes / files", home)
                 self.assertIn("data-generate-input hidden", home)
+                self.assertIn("join(String.fromCharCode(10, 10))", home)
                 self.assertIn(".png,.jpg,.jpeg,.webp,.gif,.txt,.md", home)
                 self.assertIn('formaction="/capture"', home)
                 self.assertIn('<details class="export-menu">', home)

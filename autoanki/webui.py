@@ -480,7 +480,7 @@ def _page(title: str, body: str) -> bytes:
           files.forEach(file => transfer.items.add(file));
           picker.files = transfer.files;
         }}
-        if (text && !files.length) textInput.value = [textInput.value.trim(), text.trim()].filter(Boolean).join('\n\n');
+        if (text && !files.length) textInput.value = [textInput.value.trim(), text.trim()].filter(Boolean).join(String.fromCharCode(10, 10));
         updateInputState();
       }});
       updateInputState();

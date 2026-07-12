@@ -1,91 +1,63 @@
 # AutoAnki
 
-Copy something worth remembering, get Anki cards back — reviewed by you before anything is saved.
+Turn notes, screenshots, and study material into reviewed Anki cards.
 
-AutoAnki is a small local tool. It takes text or screenshots from your clipboard, has an LLM of your choice draft a few cards, and shows them in a browser UI where you edit, discard, or accept them. Accepted cards export as a normal `.apkg` deck.
+AutoAnki runs locally in its own desktop window. Type or paste notes, drop in
+supported files, or capture text and images from your clipboard. An LLM drafts
+the cards; you edit, discard, or accept each one before anything is saved.
 
-> **Windows:** Download the ready-to-run portable app from
-> [GitHub Releases](https://github.com/markschroedr/autoanki/releases/latest).
-> Unzip it and double-click `AutoAnki.exe`—no Python installation or admin
-> access required. Your cards and exports stay inside the portable folder.
+## Download
 
-I built it for a control-engineering exam, but it's topic-agnostic: formulas, terminal commands, lecture notes, worked solutions, language learning.
+- **Windows:** [portable x64 app](https://github.com/markschroedr/autoanki/releases/latest/download/AutoAnki-Portable-Windows-x64.zip)
+- **macOS:** [portable Apple Silicon app](https://github.com/markschroedr/autoanki/releases/latest/download/AutoAnki-Portable-macOS-arm64.zip)
 
-## Why not just ask ChatGPT for cards?
+Unzip the download and open `AutoAnki.exe` or `AutoAnki.app`. No Python or
+installer is required. The macOS build is unsigned, so first launch it with
+Control-click → **Open**.
 
-Two reasons, both baked into the prompt (`autoanki/` — it's editable):
+## How it works
 
-**The prompt is designed around what makes cards actually work.** LLMs naturally produce cards that look good but test nothing — the question implies the answer, or asks vocabulary instead of the crux. The system prompt forces two checks on every card: could someone *without* the knowledge guess the answer from the phrasing, and can someone *with* the knowledge answer it unambiguously. It also keeps fronts faithful to your material while letting backs explain and derive.
+1. Type or paste text, choose a supported image, `.txt`, or `.md` file, or
+   capture text or an image from your clipboard.
+2. Generate cards into the currently selected stack.
+3. Review and edit the drafts, then accept or discard them.
+4. Export the current stack or all stacks as an Anki `.apkg` package.
 
-**You review before anything is saved.** No card enters your deck unseen. One bad card you rehearse for weeks costs more than the whole tool.
+Pending drafts survive restarts. Each stack keeps its own drafts, saved cards,
+export state, and stable Anki deck identity. Renaming a stack changes its deck
+name without creating a different deck.
 
-The model will also flag errors in your source material instead of carding them — useful when your notes were wrong in the first place.
+## Models and privacy
 
-## Install
+OpenRouter, OpenAI, Anthropic, and Gemini are supported. Choose a provider and
+model in Settings, then enter your own API key. Keys, cards, prompts, and
+exports stay in the portable folder; only material you submit for generation is
+sent to the selected provider.
 
-Requires Python 3.12+, [uv](https://docs.astral.sh/uv/), and Anki for importing.
+Back up `data/` to preserve your stacks. Generated Anki packages are written to
+`exports/` in portable builds.
+
+## Run from source
+
+Requires Python 3.12+ and [uv](https://docs.astral.sh/uv/).
 
 ```bash
 uv sync
 cp .env.example .env
-```
-
-Fill in `.env`:
-
-```bash
-AUTOANKI_PROVIDER=openrouter
-OPENROUTER_API_KEY=...
-OPENROUTER_MODEL=openai/gpt-5.6-sol
-AUTOANKI_TARGET_CARD_COUNT=3
-```
-
-OpenRouter, OpenAI, Anthropic, and Gemini are supported — see `docs/providers.md`. Provider, model, and card count can be switched from the UI; keys stay in `.env` (git-ignored).
-
-Optional: `bun add --global katex` for stricter math render checks.
-
-## Use
-
-```bash
 uv run autoanki-web
 ```
 
-1. Copy material (or drop a screenshot / text file into the UI)
-2. Capture → review the drafted cards
-3. Edit or discard weak ones, accept the rest
-4. Export and import the `.apkg` into Anki
-
-Saved and pending cards stay editable in the UI and live in a single inspectable, versioned `data/cards.json`. Organize them into stacks, switch the active stack before capturing, and export either that stack or all stacks as separate Anki decks. `uv run autoanki --rebuild` exports the active stack; use `--stack NAME`, `--all-stacks`, and `--export-mode all` to control CLI exports.
-
-There's also a CLI (`uv run autoanki`) and Windows `.cmd` launchers.
-
-## Customize
-
-The UI has a **Custom prompt** section for subject-specific instructions, appended to the generic prompt and stored locally in `data/custom_prompt.txt`. Example for a specific subject:
-
-```bash
-AUTOANKI_SUBJECT=programming workflows
-AUTOANKI_TAGS=command,setup,debugging,workflow,mistake,concept
-```
-
-Different models produce noticeably different cards — frontier models catch source errors and find better cruxes. Worth testing a few against each other before settling; card generation is cheap either way.
-
-## Data
-
-Everything stays local. `.env`, `data/`, and `output/` are git-ignored. Card format: `examples/cards.example.json`.
-
-AutoAnki only works from your clipboard — it doesn't scrape or bypass study platforms. Use it with material you're allowed to use.
+The source version uses `data/` for cards and `output/` for exports. There is
+also a CLI available through `uv run autoanki`; use `--help` for its stack and
+export options. Provider details live in [docs/providers.md](docs/providers.md).
 
 ## Development
 
 ```bash
-uv run python -m unittest discover -s tests        # test suite
-uv run python -m scripts.real_webui_e2e            # real-provider smoke test
+uv run python -m unittest discover -s tests
+uv run python -m scripts.real_webui_e2e
 ```
 
-```text
-autoanki/    application package and editable prompts
-scripts/     maintenance and smoke tests
-tests/       test suite
-```
+Portable release instructions are in [docs/release.md](docs/release.md).
 
-PyInstaller build: `docs/release.md`.
+Licensed under the [MIT License](LICENSE).

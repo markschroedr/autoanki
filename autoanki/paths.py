@@ -10,7 +10,7 @@ elif (SOURCE_ROOT / "pyproject.toml").exists():
 else:
     PROJECT_ROOT = Path.cwd()
 DATA_DIR = PROJECT_ROOT / "data"
-OUTPUT_DIR = PROJECT_ROOT / "output"
+OUTPUT_DIR = PROJECT_ROOT / ("exports" if getattr(sys, "frozen", False) else "output")
 CARDS_PATH = DATA_DIR / "cards.json"
 DECK_PATH = OUTPUT_DIR / "autoanki.apkg"
 CUSTOM_PROMPT_PATH = DATA_DIR / "custom_prompt.txt"

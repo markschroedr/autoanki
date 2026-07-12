@@ -4,6 +4,11 @@ Copy something worth remembering, get Anki cards back — reviewed by you before
 
 AutoAnki is a small local tool. It takes text or screenshots from your clipboard, has an LLM of your choice draft a few cards, and shows them in a browser UI where you edit, discard, or accept them. Accepted cards export as a normal `.apkg` deck.
 
+> **Windows:** Download the ready-to-run portable app from
+> [GitHub Releases](https://github.com/markschroedr/autoanki/releases/latest).
+> Unzip it and double-click `AutoAnki.exe`—no Python installation or admin
+> access required. Your cards and exports stay inside the portable folder.
+
 I built it for a control-engineering exam, but it's topic-agnostic: formulas, terminal commands, lecture notes, worked solutions, language learning.
 
 ## Why not just ask ChatGPT for cards?

@@ -27,4 +27,5 @@ autoanki = ["system_prompt.txt"]
 [dependency-groups]
 release = [
     "pyinstaller>=6.21.0",
+    "pywebview>=6.1",
 ]

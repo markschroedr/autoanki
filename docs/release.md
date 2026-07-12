@@ -1,26 +1,29 @@
-# One-Folder Release
+# Portable Windows Release
 
-AutoAnki can be bundled with PyInstaller as a one-folder app.
+AutoAnki can be bundled as an unzip-and-run desktop app. It uses a native
+webview while keeping the local Python server and all user files on disk.
 
 Build locally:
 
 ```bash
-uv sync --group release
-uv run pyinstaller autoanki.spec --noconfirm
+powershell -ExecutionPolicy Bypass -File scripts/build_portable.ps1
 ```
 
 Output:
 
 ```text
-dist/AutoAnki/
+release/AutoAnki-Portable-Windows-x64.zip
 ```
 
 Run:
 
 ```bash
-./dist/AutoAnki/AutoAnki
+Unzip the archive and double-click AutoAnki.exe.
 ```
 
-Copy `.env.example` to `dist/AutoAnki/.env`, fill in one provider key, then start the executable again.
+Provider settings and API keys can be entered in the app. They are stored only
+in the portable folder's `.env` file.
 
-The one-folder build includes `autoanki/system_prompt.txt`, so the executable can generate cards without needing the source tree. Runtime cards, custom prompt instructions, and decks are written beside the executable under `data/` and `output/`.
+The archive contains only the entry point and runtime support at its top level,
+plus `data/` for cards and `exports/` for generated Anki packages. Keep the
+whole folder together when moving it between computers.

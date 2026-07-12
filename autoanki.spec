@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ["scripts/launch_web.py"],
+    ["scripts/launch_desktop.py"],
     pathex=["."],
     binaries=[],
     datas=[("autoanki/system_prompt.txt", "autoanki")],
@@ -26,7 +26,7 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    console=True,
+    console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,

@@ -2,6 +2,8 @@
 
 Turn notes, screenshots, and study material into reviewed Anki cards.
 
+![AutoAnki overview](docs/media/product/autoanki-hero.png)
+
 AutoAnki runs locally in its own desktop window. Type or paste notes, drop in
 supported files, or capture text and images from your clipboard. An LLM drafts
 the cards; you edit, discard, or accept each one before anything is saved.
@@ -22,6 +24,8 @@ Control-click → **Open**.
 2. Generate cards into the currently selected stack.
 3. Review and edit the drafts, then accept or discard them.
 4. Export the current stack or all stacks as an Anki `.apkg` package.
+
+![AutoAnki capture and review workflow](docs/media/product/autoanki-layered-workflow.png)
 
 Pending drafts survive restarts. Each stack keeps its own drafts, saved cards,
 export state, and stable Anki deck identity. Renaming a stack changes its deck

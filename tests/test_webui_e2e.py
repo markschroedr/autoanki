@@ -67,6 +67,36 @@ class WebUiE2ETests(unittest.TestCase):
         with urllib.request.urlopen(request, timeout=10) as response:
             return response.read().decode("utf-8", errors="replace")
 
+    def test_startup_revalidates_existing_cards_with_embedded_katex(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            cards_path = tmp_path / "cards.json"
+            save_cards(
+                [
+                    {
+                        "id": "existing-card",
+                        "created": "2026-07-18T00:00:00+00:00",
+                        "type": "basic",
+                        "front": r"What is \(G(j\omega)\)?",
+                        "back": "A frequency response.",
+                        "tags": ["formula"],
+                        "source": {"text": None, "image_b64": None},
+                        "render_ok": True,
+                        "validation_errors": [],
+                        "validation_warnings": ["stale warning"],
+                    }
+                ],
+                cards_path,
+            )
+
+            state = WebState(cards_path=cards_path, output_path=tmp_path / "autoanki.apkg")
+            state.refresh_validation()
+
+            card = load_cards(cards_path)[0]
+            self.assertTrue(card["render_ok"])
+            self.assertEqual(card["validation_errors"], [])
+            self.assertEqual(card["validation_warnings"], [])
+
     def test_webui_capture_preview_accept_export_and_stop(self):
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)

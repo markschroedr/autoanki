@@ -8,7 +8,11 @@ a = Analysis(
     ["scripts/launch_desktop.py"],
     pathex=["."],
     binaries=[],
-    datas=[("autoanki/system_prompt.txt", "autoanki")],
+    datas=[
+        ("autoanki/system_prompt.txt", "autoanki"),
+        ("autoanki/vendor/katex.min.js", "autoanki/vendor"),
+        ("autoanki/vendor/KATEX_LICENSE.txt", "autoanki/vendor"),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

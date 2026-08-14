@@ -4,7 +4,6 @@ import base64
 import json
 import os
 import re
-import sys
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -12,7 +11,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from .paths import CUSTOM_PROMPT_PATH
+from .paths import CUSTOM_PROMPT_PATH, PROJECT_ROOT
 from .text_clean import clean_cards, clean_source
 
 
@@ -46,6 +45,7 @@ UNICODE_GLITCH_WARNING = (
     "bitte die Ausgabe vor dem Speichern prüfen."
 )
 MAX_CUSTOM_PROMPT_LENGTH = 20_000
+DEFAULT_SYSTEM_PROMPT_PATH = Path(__file__).with_name("system_prompt.txt")
 
 
 def load_custom_prompt(path: str | Path = CUSTOM_PROMPT_PATH) -> str:
@@ -199,12 +199,7 @@ def writable_runtime_path(path: str | Path = ".env") -> Path:
     file_path = Path(path)
     if file_path.is_absolute():
         return file_path
-    existing_path = resolve_runtime_path(file_path)
-    if existing_path is not None:
-        return existing_path
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent / file_path
-    return Path.cwd() / file_path
+    return PROJECT_ROOT / file_path
 
 
 def resolve_runtime_path(path: str | Path, must_exist: bool = True) -> Path | None:
@@ -212,18 +207,8 @@ def resolve_runtime_path(path: str | Path, must_exist: bool = True) -> Path | No
     if file_path.is_absolute():
         return file_path if file_path.exists() or not must_exist else None
 
-    candidates = [Path.cwd() / file_path]
-    if getattr(sys, "frozen", False):
-        candidates.append(Path(sys.executable).resolve().parent / file_path)
-    bundle_dir = getattr(sys, "_MEIPASS", None)
-    if bundle_dir:
-        candidates.append(Path(bundle_dir) / file_path)
-    candidates.append(Path(__file__).resolve().parent / file_path)
-
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None if must_exist else candidates[0]
+    candidate = PROJECT_ROOT / file_path
+    return candidate if candidate.exists() or not must_exist else None
 
 
 def update_dotenv_values(updates: dict[str, str], path: str | Path = ".env") -> Path:
@@ -396,7 +381,7 @@ class CardGenerator:
         self,
         api_key: str | None = None,
         model: str | None = None,
-        prompt_path: str | Path = "system_prompt.txt",
+        prompt_path: str | Path = DEFAULT_SYSTEM_PROMPT_PATH,
         custom_prompt_path: str | Path = CUSTOM_PROMPT_PATH,
         provider: str | None = None,
         timeout: int = 90,

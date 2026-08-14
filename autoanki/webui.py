@@ -25,6 +25,7 @@ from .generator import (
     image_to_b64,
     list_provider_models,
     load_custom_prompt,
+    load_dotenv,
     provider_status,
     save_custom_prompt,
     set_provider_model,
@@ -74,6 +75,13 @@ class WebState:
     message: str = ""
     error: str = ""
     last_export: Path | None = None
+
+    def refresh_validation(self) -> None:
+        store = load_store(self.cards_path)
+        for stack in store["stacks"]:
+            validate_cards(stack["pending"])
+            validate_cards(stack["cards"])
+        save_store(store, self.cards_path)
 
     @property
     def store(self) -> dict[str, Any]:
@@ -1325,7 +1333,9 @@ def run_server(
     output_path: str | Path = DECK_PATH,
     open_browser: bool = True,
 ) -> None:
+    load_dotenv()
     state = WebState(cards_path=_default_runtime_path(cards_path), output_path=_default_runtime_path(output_path))
+    state.refresh_validation()
     server = make_server(host, port, state)
     url = f"http://{host}:{server.server_port}/"
     print(f"AutoAnki WebUI running at {url}")

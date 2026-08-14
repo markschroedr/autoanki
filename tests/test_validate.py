@@ -1,4 +1,3 @@
-import subprocess
 import unittest
 from unittest.mock import patch
 
@@ -30,26 +29,30 @@ class ValidateTests(unittest.TestCase):
         self.assertFalse(result.ok)
         self.assertTrue(any("cloze wrapper must surround MathJax delimiters" in error for error in result.errors))
 
-    @patch("autoanki.validate.shutil.which", return_value="katex")
-    @patch("autoanki.validate.subprocess.run")
-    def test_katex_error_marks_card_invalid(self, run, _which):
-        run.return_value = subprocess.CompletedProcess(["katex"], 1, "", "ParseError")
+    def test_invalid_math_marks_card_invalid(self):
         result = validate_card(
-            {"type": "basic", "front": r"What is \(bad\)?", "back": "Nope", "tags": ["formula"]},
+            {"type": "basic", "front": r"What is \(\frac{1}{\)?", "back": "Nope", "tags": ["formula"]},
             check_math=True,
         )
         self.assertFalse(result.ok)
-        self.assertIn("ParseError", result.errors)
+        self.assertTrue(any("KaTeX parse error" in error for error in result.errors))
 
-    @patch("autoanki.validate.shutil.which", return_value=None)
-    def test_missing_katex_is_warning_not_error(self, _which):
+    def test_valid_math_is_checked_without_external_cli(self):
         result = validate_card(
             {"type": "basic", "front": r"What is \(G(j\omega)\)?", "back": "A frequency response.", "tags": ["formula"]},
             check_math=True,
         )
         self.assertTrue(result.ok)
         self.assertEqual(result.errors, [])
-        self.assertIn("math render check skipped", result.warnings[0])
+        self.assertEqual(result.warnings, [])
+
+    def test_unknown_math_command_marks_card_invalid(self):
+        result = validate_card(
+            {"type": "basic", "front": r"What is \(\unknowncommand{x}\)?", "back": "Nope", "tags": ["formula"]},
+            check_math=True,
+        )
+        self.assertFalse(result.ok)
+        self.assertTrue(any("Undefined control sequence" in error for error in result.errors))
 
     @patch.dict("os.environ", {"AUTOANKI_TAGS": "command,workflow"}, clear=True)
     def test_validation_uses_configured_tags(self):

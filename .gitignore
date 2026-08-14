@@ -10,6 +10,7 @@ __pycache__/
 build/
 dist/
 release/
+tmp/
 data/
 output/
 experiments/
@@ -19,3 +20,4 @@ rt_quickcap.apkg
 regen_comparison.md
 regen_overwrite_report.md
 .quickcap_preview_*.html
+assets/*.icns

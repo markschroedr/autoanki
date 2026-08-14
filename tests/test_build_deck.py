@@ -1,5 +1,7 @@
+import sqlite3
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from autoanki.build_deck import NoUnexportedCards, build_deck
@@ -126,6 +128,48 @@ class BuildDeckTests(unittest.TestCase):
             self.assertEqual(actual_output, tmp_path / "deck.apkg")
             self.assertTrue(actual_output.exists())
             self.assertFalse(output_path.exists())
+
+    def test_build_deck_can_place_source_image_on_basic_card_front(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_path = Path(tmp)
+            cards_path = tmp_path / "cards.json"
+            output_path = tmp_path / "front-image.apkg"
+            save_cards(
+                [
+                    {
+                        "id": "front-image-card",
+                        "created": "2026-07-26T00:00:00+00:00",
+                        "type": "basic",
+                        "front": "Identify the plotted response.",
+                        "back": "PT1 response.",
+                        "tags": ["concept"],
+                        "source": {
+                            "text": "exam plot",
+                            "image_b64": (
+                                "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC"
+                                "AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+                            ),
+                            "image_side": "front",
+                        },
+                        "render_ok": True,
+                    }
+                ],
+                cards_path,
+            )
+
+            build_deck(cards_path, output_path)
+
+            with zipfile.ZipFile(output_path) as package:
+                self.assertIn("media", package.namelist())
+                media = package.read("media").decode("utf-8")
+                self.assertIn("quickcap_", media)
+                collection_path = tmp_path / "collection.anki2"
+                collection_path.write_bytes(package.read("collection.anki2"))
+            with sqlite3.connect(collection_path) as connection:
+                fields = connection.execute("SELECT flds FROM notes").fetchone()[0]
+            front, back = fields.split("\x1f")
+            self.assertIn("<img src=", front)
+            self.assertNotIn("<img src=", back)
 
 
 if __name__ == "__main__":

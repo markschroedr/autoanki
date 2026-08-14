@@ -12,8 +12,10 @@ from autoanki.generator import (
     load_custom_prompt,
     load_dotenv,
     provider_status,
+    resolve_runtime_path,
     save_custom_prompt,
     set_provider_model,
+    writable_runtime_path,
 )
 
 
@@ -39,6 +41,21 @@ class GeneratorTests(unittest.TestCase):
             with patch.dict(os.environ, {}, clear=True):
                 load_dotenv(path)
                 self.assertEqual(os.environ["OPENROUTER_API_KEY"], "test-key")
+
+    def test_relative_runtime_files_use_the_portable_root(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            portable_root = Path(tmp)
+            env_path = portable_root / ".env"
+            env_path.write_text("OPENROUTER_API_KEY=portable-key\n", encoding="utf-8")
+
+            with (
+                patch("autoanki.generator.PROJECT_ROOT", portable_root),
+                patch.dict(os.environ, {}, clear=True),
+            ):
+                load_dotenv()
+                self.assertEqual(os.environ["OPENROUTER_API_KEY"], "portable-key")
+                self.assertEqual(resolve_runtime_path(".env"), env_path)
+                self.assertEqual(writable_runtime_path(".env"), env_path)
 
     def test_payload_uses_configured_gemini_model(self):
         with patch.dict(os.environ, {"AUTOANKI_TARGET_CARD_COUNT": "5"}, clear=True):

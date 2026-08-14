@@ -6,7 +6,7 @@ on:
       release_tag:
         description: Existing GitHub release tag to attach the build to
         required: true
-        default: v0.2.0
+        default: v0.3.0
 
 permissions:
   contents: write

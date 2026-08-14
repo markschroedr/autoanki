@@ -46,9 +46,15 @@ def _media_filename(card: dict[str, Any]) -> str | None:
     return f"quickcap_{digest}.png"
 
 
-def _with_source_image(html: str, card: dict[str, Any]) -> str:
+def _with_source_image(
+    html: str,
+    card: dict[str, Any],
+    side: Literal["front", "back"],
+    default_side: Literal["front", "back"],
+) -> str:
     filename = _media_filename(card)
-    if not filename:
+    image_side = (card.get("source") or {}).get("image_side", default_side)
+    if not filename or image_side != side:
         return html
     return f'{html}<br><img src="{filename}">'
 
@@ -139,8 +145,18 @@ def build_deck(
                     note = genanki.Note(
                     model=cloze_model,
                     fields=[
-                        _with_source_image(clean_text(card.get("front", "")), card),
-                        clean_text(card.get("back", "")),
+                        _with_source_image(
+                            clean_text(card.get("front", "")),
+                            card,
+                            "front",
+                            "front",
+                        ),
+                        _with_source_image(
+                            clean_text(card.get("back", "")),
+                            card,
+                            "back",
+                            "front",
+                        ),
                     ],
                     tags=tags,
                     guid=_stable_guid(card_id),
@@ -149,8 +165,18 @@ def build_deck(
                     note = genanki.Note(
                     model=basic_model,
                     fields=[
-                        clean_text(card.get("front", "")),
-                        _with_source_image(clean_text(card.get("back", "")), card),
+                        _with_source_image(
+                            clean_text(card.get("front", "")),
+                            card,
+                            "front",
+                            "back",
+                        ),
+                        _with_source_image(
+                            clean_text(card.get("back", "")),
+                            card,
+                            "back",
+                            "back",
+                        ),
                     ],
                     tags=tags,
                     guid=_stable_guid(card_id),

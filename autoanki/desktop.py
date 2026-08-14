@@ -4,12 +4,15 @@ import threading
 
 import webview
 
+from .generator import load_dotenv
 from .paths import CARDS_PATH, DECK_PATH
 from .webui import DEFAULT_HOST, DEFAULT_PORT, WebState, make_server
 
 
 def main() -> int:
+    load_dotenv()
     state = WebState(cards_path=CARDS_PATH, output_path=DECK_PATH)
+    state.refresh_validation()
     server = make_server(DEFAULT_HOST, DEFAULT_PORT, state)
     url = f"http://{DEFAULT_HOST}:{server.server_port}/"
     server_thread = threading.Thread(target=server.serve_forever, daemon=True)

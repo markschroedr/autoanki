@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import re
-import shutil
-import subprocess
 import os
+import re
 from dataclasses import dataclass, field
 from typing import Any
+
+from .math_renderer import validate_math
 
 
 INLINE_MATH = re.compile(r"\\\((.*?)\\\)", re.DOTALL)
@@ -51,25 +51,6 @@ def has_cloze_inside_math(text: str) -> bool:
     return any(CLOZE.search(snippet) for snippet in extract_math_snippets(text))
 
 
-def _validate_katex(snippet: str) -> tuple[bool | None, str | None]:
-    executable = shutil.which("katex.cmd") if os.name == "nt" else None
-    executable = executable or shutil.which("katex")
-    if executable is None:
-        return None, "katex CLI not found; math render check skipped"
-    result = subprocess.run(
-        [executable],
-        input=snippet,
-        text=True,
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode == 0:
-        return True, None
-    return False, result.stderr.strip() or "katex render failed"
-
-
 def validate_card(
     card: dict[str, Any],
     check_math: bool = True,
@@ -111,10 +92,8 @@ def validate_card(
 
     if check_math:
         for snippet in extract_math_snippets(front + "\n" + back):
-            ok, message = _validate_katex(snippet)
-            if ok is None:
-                warnings.append(message or "math render check skipped")
-            elif not ok:
+            ok, message = validate_math(snippet)
+            if not ok:
                 errors.append(message or "math render failed")
 
     return ValidationResult(ok=not errors, errors=errors, warnings=warnings)

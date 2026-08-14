@@ -4,7 +4,6 @@ import html
 import json
 import os
 import re
-import shutil
 import subprocess
 import tempfile
 import webbrowser
@@ -16,66 +15,58 @@ from .text_clean import clean_text
 
 MATH_PATTERN = re.compile(r"\\\((.*?)\\\)|\\\[(.*?)\\\]", re.DOTALL)
 CLOZE_PATTERN = re.compile(r"\{\{c(\d+)::(.*?)(?:::(.*?))?\}\}", re.DOTALL)
+LINE_BREAK_PATTERN = re.compile(r"<br\s*/?>", re.IGNORECASE)
 
 
-def _katex_executable() -> str | None:
-    if os.name == "nt":
-        return shutil.which("katex.cmd") or shutil.which("katex")
-    return shutil.which("katex")
+def _render_literal(value: str) -> str:
+    """Escape plain card text while preserving Anki's line-break markup."""
+    rendered = []
+    last = 0
+    for match in LINE_BREAK_PATTERN.finditer(value or ""):
+        rendered.append(html.escape(value[last : match.start()]).replace("\n", "<br>"))
+        rendered.append("<br>")
+        last = match.end()
+    rendered.append(html.escape((value or "")[last:]).replace("\n", "<br>"))
+    return "".join(rendered)
 
 
-def _render_katex(snippet: str, display: bool = False) -> str | None:
-    executable = _katex_executable()
-    if not executable:
-        return None
-    command = [executable]
-    if display:
-        command.append("--display-mode")
-    result = subprocess.run(
-        command,
-        input=snippet,
-        text=True,
-        encoding="utf-8",
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        check=False,
-    )
-    if result.returncode != 0:
-        return None
-    return result.stdout.strip()
+def _render_math(value: str) -> str:
+    rendered = []
+    last = 0
+    for match in MATH_PATTERN.finditer(value or ""):
+        rendered.append(_render_literal(value[last : match.start()]))
+        rendered.append(html.escape(match.group(0)))
+        last = match.end()
+    rendered.append(_render_literal((value or "")[last:]))
+    return "".join(rendered)
 
 
-def _render_plain(value: str) -> str:
+def _render_clozes(value: str) -> str:
     rendered = []
     last = 0
     for match in CLOZE_PATTERN.finditer(value or ""):
-        rendered.append(html.escape(value[last : match.start()]))
+        rendered.append(_render_math(value[last : match.start()]))
         number = html.escape(match.group(1))
-        answer = html.escape(match.group(2))
+        answer = _render_math(match.group(2))
         hint = match.group(3)
-        hint_html = f'<span class="cloze-hint"> ({html.escape(hint)})</span>' if hint else ""
+        hint_html = f'<span class="cloze-hint"> ({_render_math(hint)})</span>' if hint else ""
         rendered.append(f'<mark class="cloze-answer"><span>c{number}</span>{answer}{hint_html}</mark>')
         last = match.end()
-    rendered.append(html.escape((value or "")[last:]))
+    rendered.append(_render_math((value or "")[last:]))
     return "".join(rendered)
 
 
 def _render_text(value: str) -> str:
-    """Escape card text while leaving MathJax delimiters for browser typesetting."""
+    """Safely render clozes, MathJax, newlines, and Anki line breaks."""
     value = clean_text(value)
-    rendered = []
-    last = 0
-    for match in MATH_PATTERN.finditer(value or ""):
-        rendered.append(_render_plain(value[last : match.start()]))
-        rendered.append(html.escape(match.group(0)))
-        last = match.end()
-    rendered.append(_render_plain((value or "")[last:]))
-    return "".join(rendered).replace("\n", "<br>")
+    return _render_clozes(value)
 
 
-def _card_image_html(card: dict[str, Any]) -> str:
+def _card_image_html(card: dict[str, Any], side: str) -> str:
     image_b64 = (card.get("source") or {}).get("image_b64")
-    if not image_b64:
+    default_side = "front" if card.get("type") == "cloze" else "back"
+    image_side = (card.get("source") or {}).get("image_side", default_side)
+    if not image_b64 or image_side != side:
         return ""
     return f'<figure><img src="data:image/png;base64,{image_b64}" alt="clipboard image"></figure>'
 
@@ -101,6 +92,8 @@ def render_cards_html(
         tags = ", ".join(card.get("tags") or [])
         front = _render_text(card.get("front") or "")
         back = _render_text(card.get("back") or "")
+        front_image = _card_image_html(card, "front")
+        back_image = _card_image_html(card, "back")
         footer_html = card_footer(card) if card_footer else ""
         rendered_cards.append(
             f"""
@@ -110,8 +103,9 @@ def render_cards_html(
                 <span>{html.escape(tags)}</span>
               </header>
               <section class="front">{front}</section>
+              {front_image}
               <section class="back">{back}</section>
-              {_card_image_html(card)}
+              {back_image}
               {error_html}
               {warning_html}
               {footer_html}
